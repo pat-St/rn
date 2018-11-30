@@ -2,7 +2,7 @@ import time
 import socket
 import threading
 
-HOST = '127.0.0.1'  # '141.37.168.'
+HOST = '192.168.2.'  # '141.37.168.'
 PORT = 50000
 server_activity_period = 30
 ADDR = (HOST, PORT)
@@ -89,7 +89,7 @@ def scanNetwork():
     for i in LowestIP, HighestIP:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
-        newHostIP = HOST #+ str(i)
+        newHostIP = HOST + str(i)
         try:
             sock.connect_ex((newHostIP, PORT))
             sock.send(sendNickname.encode("utf-8"))
@@ -133,7 +133,7 @@ def quitThread(conn):
 
 
 while True:
-    username = input("Set a username: ")
+    username = input("Set a username:")
     userinput = input("is ${username} right? [Y/n] ")
     if userinput == "Y" or userinput == "":
         break
