@@ -1,0 +1,134 @@
+import time
+import socket
+import threading
+
+HOST = '127.0.0.1' #'141.37.168.'
+PORT = 50000
+server_activity_period = 30
+ADDR = (HOST, PORT)
+pool_size = 5
+
+LowestIP = 1
+HighestIP = 63
+
+username = ""
+activeUser = dict()
+print_lock = threading.Lock()
+
+threadPool = []
+
+def receiveClients():
+    sendNickname = 'S ' + username
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(('0.0.0.0', PORT))
+    sock.listen()
+    while True:
+        try:
+            conn, addr = sock.accept()
+            othernickname = conn.recv(1024).decode("utf-8")
+            sock.send(sendNickname.encode("utf-8"))
+            otheraddress = socket.gethostbyname(sock.getpeername())
+            with print_lock:
+                print("otheraddress: " + otheraddress + "\n")
+            othernickname = othernickname.split("\\s")[1]
+            activeUser[sock] = othernickname
+            t = threading.Thread(target=receiveMessageThread, args=(sock))
+            t.daemon = True
+            threadPool.append(t)
+            t.start()
+        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError):
+            sock.close()
+            pass
+        except socket.timeout:
+            sock.close()
+            pass
+
+def receiveMessageThread(conn):
+    while True:
+        try:
+            data = conn.recv(1024)
+            if not data:
+                print('Connection closed from other side'+"\n")
+                print('Closing ...'+"\n")
+                conn.close()
+                break
+            with print_lock:
+                print(activeUser.get(conn) + " : " + data.decode('utf-8') + "\n")
+        except socket.timeout:
+            with print_lock:
+                print('Socket timed out at', time.asctime()+"\n")
+
+def scanNetwork():
+    sendNickname = 'S ' + username
+    for i in LowestIP, HighestIP:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        newHostIP = HOST #+ str(i)
+        try:
+            sock.connect_ex((newHostIP, 50000))
+            sock.send(sendNickname.encode("utf-8"))
+            othernickname = sock.recv(1024).decode("utf-8")
+            otheraddress = sock.getpeername()
+            print("otheraddress: " + str(otheraddress) +"\n")
+            othernickname = str(othernickname).split("\\s")[1]
+            activeUser[sock] = othernickname
+            t = threading.Thread(target=receiveMessageThread, args=(sock))
+            t.daemon = True
+            threadPool.append(t)
+            t.start()
+        except (ConnectionRefusedError,ConnectionAbortedError,BrokenPipeError):
+            sock.close()
+            pass
+        except socket.timeout:
+            sock.close()
+            pass
+def sendMessage(nickname, message):
+    for key, value in activeUser:
+        if value == nickname:
+            try:
+                key.send(message.encode("utf-8"))
+            except key.timeout:
+                key.close()
+                pass
+def listClients():
+    for key, value in activeUser:
+        print("found user" + value + "from adress " + str(key))
+
+def quitThread(conn):
+    while True:
+        try:
+            conn.send('Q'.encode("utf-8"))
+            print('Closing ...'+"\n")
+        except socket.timeout:
+            with print_lock:
+                print('Socket timed out at', time.asctime()+"\n")
+        conn.close()
+
+while True:
+    username = input("Set a username: ")
+    userinput = input("is ${username} right? [Y/n] ")
+    if userinput == "Y" or userinput == "":
+        break
+
+receiveThread = threading.Thread(target=receiveClients)
+receiveThread.daemon = True
+receiveThread.start()
+scanNetwork()
+for i in activeUser:
+    print("user:" + i + "\n")
+
+while True:
+    inputMessage = input(">")
+    if inputMessage == 'Q':
+        for key, value in activeUser.items():
+           quitThread(key)
+        receiveThread.join(1)
+    if inputMessage.startswith('C'):
+        inputList = inputMessage.split()
+        sendMessage(inputList[1], inputList[2])
+    if inputMessage == 'L':
+        listClients()
+
+
+
+
