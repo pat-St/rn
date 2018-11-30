@@ -72,7 +72,7 @@ def receiveClients():
             othernickname = conn.recv(1024).decode("utf-8")
             sock.send(sendNickname.encode("utf-8"))
             otheraddress = socket.gethostbyname(sock.getpeername())
-            othernickname = str(othernickname).split()[2]
+            othernickname = str(othernickname).split()[1]
             with print_lock:
                 print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
             addSocketToList(conn, othernickname)
@@ -86,7 +86,7 @@ def receiveClients():
 
 def scanNetwork():
     sendNickname = 'S ' + username
-    for i in LowestIP, HighestIP:
+    for i in 62, 63:#LowestIP, HighestIP:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
         newHostIP = HOST + str(i)
@@ -96,9 +96,9 @@ def scanNetwork():
             othernickname = sock.recv(1024).decode("utf-8")
             otheraddress = sock.getpeername()
             print("otheraddress: " + str(otheraddress) + "\n")
-            othernickname = str(othernickname).split()[2]
+            othernickname = str(othernickname).split()[1]
             addSocketToList(sock, othernickname)
-        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError):
+        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError):
             sock.close()
             pass
         except socket.timeout:
@@ -149,8 +149,10 @@ while True:
         for key, value in activeUser.items():
             quitThread(key)
         receiveThread.join(1)
+        break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
-        sendMessage(inputList[2], inputList[3])
+        print(len(inputList))
+        sendMessage(inputList[1], inputList[2])
     if inputMessage == 'L':
         listClients()
