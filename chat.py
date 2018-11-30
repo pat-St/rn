@@ -76,10 +76,7 @@ def receiveClients():
             with print_lock:
                 print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
             addSocketToList(conn, othernickname)
-        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError):
-            sock.close()
-            pass
-        except socket.timeout:
+        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout):
             sock.close()
             pass
 
@@ -98,10 +95,7 @@ def scanNetwork():
             print("otheraddress: " + str(otheraddress) + "\n")
             othernickname = str(othernickname).split()[1]
             addSocketToList(sock, othernickname)
-        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError):
-            sock.close()
-            pass
-        except socket.timeout:
+        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError, socket.timeout):
             sock.close()
             pass
 
