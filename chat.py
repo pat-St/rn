@@ -46,14 +46,14 @@ def addNewClientToList(sock, nickname):
 def messageParse(message, conn):
     if message == ('Q', ""):
         with print_lock:
-            print("User [%s] quit\n", str(activeUser.get(conn)))
+            print("User [ %s ] quit", str(activeUser.get(conn)))
         quitConnection(conn)
     if message == ('C', message[1]):
         with print_lock:
-            print("[%s]: %s\n", str(activeUser.get(conn)), str(message[1]))
+            print("[ %s ]: %s", str(activeUser.get(conn)), str(message[1]))
     if message == ('S', message[1]):
         with print_lock:
-            print("Add user [%s]\n", str(message[1]))
+            print("Add user [ %s ]", str(message[1]))
         conn.send(('S ' + username).encode("utf-8"))
         addNewClientToList(conn, str(message[1]))
 
@@ -67,9 +67,14 @@ def receiveMessageThread(conn):
             data = conn.recv(1024).decode('utf-8')
             message = getMessage(data)
             messageParse(message, conn)
-        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, socket.timeout) as err:
+        except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError) as err:
+            activeUser.pop(conn)
+            conn.close()
             with print_lock:
-                print('retreive Message ', str(err) + " from " + str(activeUser.get(conn)) + "\n")
+                print('retreive Message ', str(err))
+        except socket.timeout:
+            with print_lock:
+                pass
 
 
 def waitForNewClient():
