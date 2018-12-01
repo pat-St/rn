@@ -29,7 +29,7 @@ def returnNickName(input):
 def receiveMessageThread(conn):
     while True:
         with thread_run_lock:
-            if not threading:
+            if not threadRunning:
                 break
         try:
             data = conn.recv(1024)
@@ -65,7 +65,7 @@ def receiveClients():
     sock.listen()
     while True:
         with thread_run_lock:
-            if not threading:
+            if not threadRunning:
                 break
         try:
             conn, addr = sock.accept()
@@ -76,7 +76,8 @@ def receiveClients():
             with print_lock:
                 print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
             addSocketToList(conn, othernickname)
-        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout):
+        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout) as err:
+            print(err)
             sock.close()
             pass
 
@@ -95,7 +96,8 @@ def scanNetwork():
             print("otheraddress: " + str(otheraddress) + "\n")
             othernickname = str(othernickname).split()[1]
             addSocketToList(sock, othernickname)
-        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError, socket.timeout):
+        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError, socket.timeout) as err:
+            print(err)
             sock.close()
             pass
 
@@ -140,6 +142,8 @@ scanNetwork()
 while True:
     inputMessage = input(">")
     if inputMessage == 'Q':
+        with thread_run_lock:
+            threadRunning = False
         for key, value in activeUser.items():
             quitThread(key)
         receiveThread.join(1)
