@@ -104,7 +104,7 @@ def scanNetwork():
     sendNickname = 'S ' + username
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(120)
-    for i in range(14, 64):  # range(LowestIP, HighestIP):
+    for i in 15, 62:  # range(LowestIP, HighestIP):
         newHostIP = HOST + str(i)
         try:
             sock.connect((newHostIP, PORT))
