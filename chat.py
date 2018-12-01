@@ -22,6 +22,11 @@ thread_run_lock = threading.Lock()
 threadRunning = True
 
 
+def returnTargetAdress(key):
+    (i1, i2) = key.getpeername()
+    return str(i1)
+
+
 def returnNickName(input):
     return input.split()[2]
 
@@ -39,7 +44,7 @@ def receiveMessageThread(conn):
             pass
         except socket.timeout:
             with print_lock:
-                print('retreive Message timed out at', time.asctime() + " from " + str(activeUser.get(conn)) +"\n")
+                print('retreive Message timed out at', time.asctime() + " from " + str(activeUser.get(conn)) + "\n")
 
 
 def addSocketToList(sock, nickname):
@@ -49,6 +54,7 @@ def addSocketToList(sock, nickname):
     t.daemon = True
     threadPool.append(t)
     t.start()
+
 
 def receiveClientThread(conn):
     sendNickname = 'S ' + username
@@ -60,10 +66,12 @@ def receiveClientThread(conn):
         with print_lock:
             print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
         addSocketToList(conn, othernickname)
-    except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout) as err:
+    except (
+    ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout) as err:
         with print_lock:
             print("Recieve from Client " + str(err))
         pass
+
 
 def receiveClients():
     sendNickname = 'S ' + username
@@ -73,7 +81,6 @@ def receiveClients():
     while True:
         with thread_run_lock:
             if not threadRunning:
-                sock.close()
                 break
         conn, addr = sock.accept()
         t = threading.Thread(target=receiveClientThread, args=(conn,))
@@ -81,11 +88,12 @@ def receiveClients():
         threadPool.append(t)
         t.start()
 
+
 def scanNetwork():
     sendNickname = 'S ' + username
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(20)
-    for i in 12, 63:#LowestIP, HighestIP:
+    for i in 12, 63:  # LowestIP, HighestIP:
         newHostIP = HOST + str(i)
         try:
             sock.connect((newHostIP, PORT))
@@ -99,7 +107,8 @@ def scanNetwork():
                 addSocketToList(sock, othernickname)
             except socket.timeout as err:
                 print("scan send and retreive: " + str(err))
-        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError, socket.timeout) as err:
+        except (
+        ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError, socket.timeout) as err:
             print("scan Network: " + str(err))
             sock.close()
             pass
@@ -110,26 +119,29 @@ def sendMessage(nickname, message):
         if value == nickname:
             try:
                 key.send(message.encode("utf-8"))
-            except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError, socket.timeout) as err:
+            except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
+                    socket.timeout) as err:
                 print("send Message: " + str(err))
                 pass
 
 
 def listClients():
-    for key, value in activeUser:
-        (i1,i2) = key.getpeername()
-        print("found user" + value + "from address " + str(i1))
+    for key, value in activeUser.items():
+        print("found user" + str(value) + "from address " + returnTargetAdress(key) + "\n")
 
 
-def quitThread(conn):
-    while True:
+def quitThread():
+    for key, value in activeUser.items():
         try:
-            conn.send('Q'.encode("utf-8"))
-            print('Closing ...' + "\n")
+            print('Closing ...' + returnTargetAdress(key) + "from " + str(value) + "\n")
+            key.send('Q'.encode("utf-8"))
+
+            activeUser.pop(key)
+            key.close()
         except (socket.timeout, OSError) as err:
             with print_lock:
-                print('Socket timed out at ', str(err) + "\n")
-        conn.close()
+                print('quit timed out at ', str(err) + "\n")
+            key.close()
 
 
 while True:
