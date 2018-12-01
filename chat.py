@@ -16,7 +16,7 @@ activeUser = dict()
 print_lock = threading.Lock()
 user_list_lock = threading.Lock()
 
-threadPool = []
+threadPool = dict()
 
 thread_run_lock = threading.Lock()
 threadRunning = True
@@ -78,11 +78,12 @@ def receiveMessageThread(conn):
             with print_lock:
                 pass
 
+
 def appendNewThreadInPool(conn):
-    t = threading.Thread(target=receiveMessageThread, args=(conn,))
-    t.daemon = True
-    threadPool.append(t)
+    t = threading.Thread(target=receiveMessageThread, args=(conn,), daemon=True)
+    threadPool[conn] = t
     t.start()
+
 
 def waitForNewClient():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -107,9 +108,6 @@ def scanNetwork():
             try:
                 sock.send(sendNickname.encode("utf-8"))
                 othernickname = sock.recv(1024).decode("utf-8")
-                print("receive: " + str(othernickname) + "\n")
-                (otheraddress, tmp) = sock.getpeername()
-                print("otheraddress: " + str(otheraddress) + "\n")
                 othernickname = str(othernickname).split()[1]
                 addNewClientToList(sock, othernickname)
                 appendNewThreadInPool(sock)
@@ -147,6 +145,10 @@ def quitConnection(conn):
 
 def quitAllConnections():
     copy = ()
+    with thread_run_lock:
+        threadRunning = False
+    for key, value in threadPool.items():
+        value.join(2)
     with user_list_lock:
         copy = activeUser.copy()
     for key, value in copy.items():
@@ -171,10 +173,8 @@ while True:
 # scan all client in network
 scanNetwork()
 # listen on new message
-receiveThread = threading.Thread(target=waitForNewClient)
-receiveThread.daemon = True
+receiveThread = threading.Thread(target=waitForNewClient, daemon=True)
 receiveThread.start()
-
 
 while True:
     inputMessage = input(">")
@@ -182,6 +182,7 @@ while True:
         with thread_run_lock:
             threadRunning = False
         quitAllConnections()
+        receiveThread.join(1)
         break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
