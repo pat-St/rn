@@ -67,7 +67,7 @@ def receiveMessageThread(conn):
             data = conn.recv(1024).decode('utf-8')
             message = getMessage(data)
             messageParse(message, conn)
-        except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError) as err:
+        except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
             activeUser.pop(conn)
             conn.close()
             with print_lock:
@@ -148,7 +148,8 @@ def quitAllConnections():
         try:
             print('Closing retreive from address' + returnTargetAdress(key) + " : " + str(value) + "\n")
             key.send('Q'.encode("utf-8"))
-            activeUser.pop(key)
+            with user_list_lock:
+                activeUser.pop(key)
             key.close()
         except (socket.timeout, OSError) as err:
             with print_lock:
