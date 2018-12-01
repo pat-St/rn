@@ -93,7 +93,8 @@ def scanNetwork():
             try:
                 sock.send(sendNickname.encode("utf-8"))
                 othernickname = sock.recv(1024).decode("utf-8")
-                otheraddress = sock.getpeername()
+                print("receive: " + str(othernickname) + "\n")
+                (otheraddress, tmp) = sock.getpeername()
                 print("otheraddress: " + str(otheraddress) + "\n")
                 othernickname = str(othernickname).split()[1]
                 addSocketToList(sock, othernickname)
