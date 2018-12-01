@@ -183,8 +183,8 @@ receiveThread.start()
 while True:
     inputMessage = input(">")
     if inputMessage == 'Q':
-        with thread_run_lock:
-            threadRunning = False
+        #with thread_run_lock:
+         #   threadRunning = False
         quitAllConnections()
         receiveThread.join(1)
         break
