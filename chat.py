@@ -46,14 +46,14 @@ def addNewClientToList(sock, nickname):
 def messageParse(message, conn):
     if message == ('Q', ""):
         with print_lock:
-            print("User [ %s ] quit", str(activeUser.get(conn)))
+            print("User [ " + str(activeUser.get(conn)) + " ] quit")
         quitConnection(conn)
     if message == ('C', message[1]):
         with print_lock:
-            print("[ %s ]: %s", str(activeUser.get(conn)), str(message[1]))
+            print("[ " + str(activeUser.get(conn)) + " ]: " + str(message[1]))
     if message == ('S', message[1]):
         with print_lock:
-            print("Add user [ %s ]", str(message[1]))
+            print("Add user ", str(message[1]))
         conn.send(('S ' + username).encode("utf-8"))
         addNewClientToList(conn, str(message[1]))
 
@@ -130,7 +130,7 @@ def sendMessage(nickname, message):
 
 def listClients():
     for key, value in activeUser.items():
-        print("found user" + str(value) + "from address " + returnTargetAdress(key) + "\n")
+        print("found user " + str(value) + " from address " + returnTargetAdress(key) + "\n")
 
 
 def quitConnection(conn):
@@ -140,7 +140,8 @@ def quitConnection(conn):
 
 
 def quitAllConnections():
-    for key, value in activeUser.items():
+    copy = activeUser.copy()
+    for key, value in copy.items():
         try:
             print('Closing ...' + returnTargetAdress(key) + "from " + str(value) + "\n")
             key.send('Q'.encode("utf-8"))
@@ -169,9 +170,7 @@ while True:
     if inputMessage == 'Q':
         with thread_run_lock:
             threadRunning = False
-        for key, value in activeUser.items():
-            quitAllConnections(key)
-        receiveThread.join(1)
+        quitAllConnections()
         break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
