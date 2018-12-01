@@ -53,7 +53,7 @@ def addSocketToList(sock, nickname):
     with user_list_lock:
         activeUser[sock] = nickname
     t = threading.Thread(target=receiveMessageThread, args=(sock,))
-    #t.daemon = True
+    t.daemon = True
     threadPool.append(t)
     t.start()
 
@@ -77,7 +77,7 @@ def receiveClients():
                 print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
             addSocketToList(conn, othernickname)
         except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout) as err:
-            print(err)
+            print("Recieve from Client " + str(err))
             sock.close()
             pass
 
@@ -86,18 +86,21 @@ def scanNetwork():
     sendNickname = 'S ' + username
     for i in 12, 63:#LowestIP, HighestIP:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(5)
+        sock.settimeout(10)
         newHostIP = HOST + str(i)
         try:
-            sock.connect_ex((newHostIP, PORT))
-            sock.send(sendNickname.encode("utf-8"))
-            othernickname = sock.recv(1024).decode("utf-8")
-            otheraddress = sock.getpeername()
-            print("otheraddress: " + str(otheraddress) + "\n")
-            othernickname = str(othernickname).split()[1]
-            addSocketToList(sock, othernickname)
+            sock.connect((newHostIP, PORT))
+            try:
+                sock.send(sendNickname.encode("utf-8"))
+                othernickname = sock.recv(1024).decode("utf-8")
+                otheraddress = sock.getpeername()
+                print("otheraddress: " + str(otheraddress) + "\n")
+                othernickname = str(othernickname).split()[1]
+                addSocketToList(sock, othernickname)
+            except socket.timeout as err:
+                print("scan send and retreive: " + str(err))
         except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError, socket.timeout) as err:
-            print(err)
+            print("scan Network: " + str(err))
             sock.close()
             pass
 
@@ -135,7 +138,7 @@ while True:
         break
 
 receiveThread = threading.Thread(target=receiveClients)
-#receiveThread.daemon = True
+receiveThread.daemon = True
 receiveThread.start()
 scanNetwork()
 
