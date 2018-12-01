@@ -71,7 +71,7 @@ def receiveClients():
             conn, addr = sock.accept()
             othernickname = conn.recv(1024).decode("utf-8")
             sock.send(sendNickname.encode("utf-8"))
-            otheraddress = socket.gethostbyname(sock.getpeername())
+            (otheraddress, tmp) = socket.gethostbyname(sock.getpeername())
             othernickname = str(othernickname).split()[1]
             with print_lock:
                 print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
