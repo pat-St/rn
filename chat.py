@@ -33,20 +33,13 @@ def receiveMessageThread(conn):
                 break
         try:
             data = conn.recv(1024)
-            if not data:
-                print('Connection closed from other side' + "\n")
-                print('Closing ...' + "\n")
-                break
             with print_lock:
                 print(activeUser.get(conn) + " : " + data.decode('utf-8') + "\n")
         except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError):
-            with user_list_lock:
-                activeUser.pop(conn)
-            conn.close()
             pass
         except socket.timeout:
             with print_lock:
-                print('Socket timed out at', time.asctime() + "\n")
+                print('retreive Message timed out at', time.asctime() + " from " + str(activeUser.get(conn)) +"\n")
 
 
 def addSocketToList(sock, nickname):
@@ -62,20 +55,21 @@ def receiveClientThread(conn):
     try:
         othernickname = conn.recv(1024).decode("utf-8")
         conn.send(sendNickname.encode("utf-8"))
-        (otheraddress, tmp) = socket.gethostbyname(conn.getpeername())
+        (otheraddress, tmp) = conn.getpeername()
         othernickname = str(othernickname).split()[1]
         with print_lock:
             print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
         addSocketToList(conn, othernickname)
     except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout) as err:
-        print("Recieve from Client " + str(err))
+        with print_lock:
+            print("Recieve from Client " + str(err))
         pass
 
 def receiveClients():
     sendNickname = 'S ' + username
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(('0.0.0.0', PORT))
-    sock.listen(4)
+    sock.listen()
     while True:
         with thread_run_lock:
             if not threadRunning:
@@ -90,7 +84,7 @@ def receiveClients():
 def scanNetwork():
     sendNickname = 'S ' + username
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(10)
+    sock.settimeout(20)
     for i in 12, 63:#LowestIP, HighestIP:
         newHostIP = HOST + str(i)
         try:
@@ -116,14 +110,15 @@ def sendMessage(nickname, message):
         if value == nickname:
             try:
                 key.send(message.encode("utf-8"))
-            except key.timeout:
-                key.close()
+            except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError, socket.timeout) as err:
+                print("send Message: " + str(err))
                 pass
 
 
 def listClients():
     for key, value in activeUser:
-        print("found user" + value + "from adress " + str(key))
+        (i1,i2) = key.getpeername()
+        print("found user" + value + "from address " + str(i1))
 
 
 def quitThread(conn):
@@ -131,9 +126,9 @@ def quitThread(conn):
         try:
             conn.send('Q'.encode("utf-8"))
             print('Closing ...' + "\n")
-        except socket.timeout:
+        except (socket.timeout, OSError) as err:
             with print_lock:
-                print('Socket timed out at', time.asctime() + "\n")
+                print('Socket timed out at ', str(err) + "\n")
         conn.close()
 
 
