@@ -53,20 +53,20 @@ def addSocketToList(sock, nickname):
     with user_list_lock:
         activeUser[sock] = nickname
     t = threading.Thread(target=receiveMessageThread, args=(sock,))
-    t.daemon = True
+    #t.daemon = True
     threadPool.append(t)
     t.start()
 
 
 def receiveClients():
     sendNickname = 'S ' + username
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(('0.0.0.0', PORT))
+    sock.listen(4)
     while True:
         with thread_run_lock:
             if not threadRunning:
                 break
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(('0.0.0.0', PORT))
-        sock.listen()
         try:
             conn, addr = sock.accept()
             othernickname = conn.recv(1024).decode("utf-8")
@@ -84,7 +84,7 @@ def receiveClients():
 
 def scanNetwork():
     sendNickname = 'S ' + username
-    for i in LowestIP, HighestIP:
+    for i in 12, 63:#LowestIP, HighestIP:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
         newHostIP = HOST + str(i)
@@ -135,7 +135,7 @@ while True:
         break
 
 receiveThread = threading.Thread(target=receiveClients)
-receiveThread.daemon = True
+#receiveThread.daemon = True
 receiveThread.start()
 scanNetwork()
 
