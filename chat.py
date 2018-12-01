@@ -68,7 +68,8 @@ def receiveMessageThread(conn):
             message = getMessage(data)
             messageParse(message, conn)
         except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
-            activeUser.pop(conn)
+            with user_list_lock:
+                activeUser.pop(conn)
             conn.close()
             with print_lock:
                 print('retreive Message ', str(err))
@@ -166,11 +167,13 @@ while True:
     userinput = input("is ${username} right? [Y/n] ")
     if userinput == "Y" or userinput == "":
         break
-
+# scan all client in network
+scanNetwork()
+# listen on new message
 receiveThread = threading.Thread(target=waitForNewClient)
 receiveThread.daemon = True
 receiveThread.start()
-scanNetwork()
+
 
 while True:
     inputMessage = input(">")
