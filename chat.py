@@ -16,6 +16,7 @@ activeUser = dict()
 print_lock = threading.Lock()
 user_list_lock = threading.Lock()
 
+thread_pool_lock = threading.Lock()
 threadPool = dict()
 
 thread_run_lock = threading.Lock()
@@ -81,7 +82,8 @@ def receiveMessageThread(conn):
 
 def appendNewThreadInPool(conn):
     t = threading.Thread(target=receiveMessageThread, args=(conn,), daemon=True)
-    threadPool[conn] = t
+    with thread_pool_lock:
+        threadPool[conn] = t
     t.start()
 
 
