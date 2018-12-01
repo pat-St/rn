@@ -31,50 +31,48 @@ def returnNickName(input):
     return input.split()[2]
 
 
+def getMessage(input):
+    i = input.split()
+    if len(i) >= 2:
+        return str(i[0]), "".join(map(str, i[1:]))
+    return str(i[0]), ""
+
+
+def addNewClientToList(sock, nickname):
+    with user_list_lock:
+        activeUser[sock] = nickname
+
+
+def messageParse(message, conn):
+    if message == ('Q', ""):
+        with print_lock:
+            print("User [%s] quit\n", str(activeUser.get(conn)))
+        quitConnection(conn)
+    if message == ('C', message[1]):
+        with print_lock:
+            print("[%s]: %s\n", str(activeUser.get(conn)), str(message[1]))
+    if message == ('S', message[1]):
+        with print_lock:
+            print("Add user [%s]\n", str(message[1]))
+        conn.send(('S ' + username).encode("utf-8"))
+        addNewClientToList(conn, str(message[1]))
+
+
 def receiveMessageThread(conn):
     while True:
         with thread_run_lock:
             if not threadRunning:
                 break
         try:
-            data = conn.recv(1024)
+            data = conn.recv(1024).decode('utf-8')
+            message = getMessage(data)
+            messageParse(message, conn)
+        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, socket.timeout) as err:
             with print_lock:
-                print(activeUser.get(conn) + " : " + data.decode('utf-8') + "\n")
-        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError):
-            pass
-        except socket.timeout:
-            with print_lock:
-                print('retreive Message timed out at', time.asctime() + " from " + str(activeUser.get(conn)) + "\n")
+                print('retreive Message ', str(err) + " from " + str(activeUser.get(conn)) + "\n")
 
 
-def addSocketToList(sock, nickname):
-    with user_list_lock:
-        activeUser[sock] = nickname
-    t = threading.Thread(target=receiveMessageThread, args=(sock,))
-    t.daemon = True
-    threadPool.append(t)
-    t.start()
-
-
-def receiveClientThread(conn):
-    sendNickname = 'S ' + username
-    try:
-        othernickname = conn.recv(1024).decode("utf-8")
-        conn.send(sendNickname.encode("utf-8"))
-        (otheraddress, tmp) = conn.getpeername()
-        othernickname = str(othernickname).split()[1]
-        with print_lock:
-            print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
-        addSocketToList(conn, othernickname)
-    except (
-    ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout) as err:
-        with print_lock:
-            print("Recieve from Client " + str(err))
-        pass
-
-
-def receiveClients():
-    sendNickname = 'S ' + username
+def waitForNewClient():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind(('0.0.0.0', PORT))
     sock.listen()
@@ -83,7 +81,7 @@ def receiveClients():
             if not threadRunning:
                 break
         conn, addr = sock.accept()
-        t = threading.Thread(target=receiveClientThread, args=(conn,))
+        t = threading.Thread(target=receiveMessageThread, args=(conn,))
         t.daemon = True
         threadPool.append(t)
         t.start()
@@ -92,7 +90,7 @@ def receiveClients():
 def scanNetwork():
     sendNickname = 'S ' + username
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(20)
+    sock.settimeout(120)
     for i in 12, 63:  # LowestIP, HighestIP:
         newHostIP = HOST + str(i)
         try:
@@ -104,24 +102,24 @@ def scanNetwork():
                 (otheraddress, tmp) = sock.getpeername()
                 print("otheraddress: " + str(otheraddress) + "\n")
                 othernickname = str(othernickname).split()[1]
-                addSocketToList(sock, othernickname)
+                addNewClientToList(sock, othernickname)
             except socket.timeout as err:
                 print("scan send and retreive: " + str(err))
         except (
-        ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError, socket.timeout) as err:
+                ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
+                socket.timeout) as err:
             print("scan Network: " + str(err))
-            sock.close()
             pass
 
 
 def sendMessage(nickname, message):
-    for key, value in activeUser:
+    for key, value in activeUser.items():
         if value == nickname:
             try:
-                key.send(message.encode("utf-8"))
+                key.send(('C ' + message).encode("utf-8"))
             except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
                     socket.timeout) as err:
-                print("send Message: " + str(err))
+                print("send Message Error: " + str(err))
                 pass
 
 
@@ -130,12 +128,17 @@ def listClients():
         print("found user" + str(value) + "from address " + returnTargetAdress(key) + "\n")
 
 
-def quitThread():
+def quitConnection(conn):
+    if activeUser.__contains__(conn):
+        activeUser.pop(conn)
+        conn.close()
+
+
+def quitAllConnections():
     for key, value in activeUser.items():
         try:
             print('Closing ...' + returnTargetAdress(key) + "from " + str(value) + "\n")
             key.send('Q'.encode("utf-8"))
-
             activeUser.pop(key)
             key.close()
         except (socket.timeout, OSError) as err:
@@ -144,13 +147,14 @@ def quitThread():
             key.close()
 
 
+# start point
 while True:
     username = input("Set a username:")
     userinput = input("is ${username} right? [Y/n] ")
     if userinput == "Y" or userinput == "":
         break
 
-receiveThread = threading.Thread(target=receiveClients)
+receiveThread = threading.Thread(target=waitForNewClient)
 receiveThread.daemon = True
 receiveThread.start()
 scanNetwork()
@@ -161,7 +165,7 @@ while True:
         with thread_run_lock:
             threadRunning = False
         for key, value in activeUser.items():
-            quitThread(key)
+            quitAllConnections(key)
         receiveThread.join(1)
         break
     if inputMessage.startswith('C'):
