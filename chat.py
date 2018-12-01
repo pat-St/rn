@@ -57,6 +57,19 @@ def addSocketToList(sock, nickname):
     threadPool.append(t)
     t.start()
 
+def receiveClientThread(conn):
+    sendNickname = 'S ' + username
+    try:
+        othernickname = conn.recv(1024).decode("utf-8")
+        conn.send(sendNickname.encode("utf-8"))
+        (otheraddress, tmp) = socket.gethostbyname(conn.getpeername())
+        othernickname = str(othernickname).split()[1]
+        with print_lock:
+            print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
+        addSocketToList(conn, othernickname)
+    except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout) as err:
+        print("Recieve from Client " + str(err))
+        pass
 
 def receiveClients():
     sendNickname = 'S ' + username
@@ -66,27 +79,19 @@ def receiveClients():
     while True:
         with thread_run_lock:
             if not threadRunning:
+                sock.close()
                 break
-        try:
-            conn, addr = sock.accept()
-            othernickname = conn.recv(1024).decode("utf-8")
-            sock.send(sendNickname.encode("utf-8"))
-            (otheraddress, tmp) = socket.gethostbyname(sock.getpeername())
-            othernickname = str(othernickname).split()[1]
-            with print_lock:
-                print("otheraddress: " + otheraddress + " other nickname " + othernickname + "\n")
-            addSocketToList(conn, othernickname)
-        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError, IndexError, socket.timeout) as err:
-            print("Recieve from Client " + str(err))
-            sock.close()
-            pass
-
+        conn, addr = sock.accept()
+        t = threading.Thread(target=receiveClientThread, args=(conn,))
+        t.daemon = True
+        threadPool.append(t)
+        t.start()
 
 def scanNetwork():
     sendNickname = 'S ' + username
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(10)
     for i in 12, 63:#LowestIP, HighestIP:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(10)
         newHostIP = HOST + str(i)
         try:
             sock.connect((newHostIP, PORT))
