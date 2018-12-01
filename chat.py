@@ -81,7 +81,8 @@ def receiveMessageThread(conn):
 
 
 def appendNewThreadInPool(conn):
-    t = threading.Thread(target=receiveMessageThread, args=(conn,), daemon=True)
+    t = threading.Thread(target=receiveMessageThread, args=(conn,))
+    t.daemon = True
     with thread_pool_lock:
         threadPool.append(t)
     t.start()
@@ -175,7 +176,8 @@ while True:
 # scan all client in network
 scanNetwork()
 # listen on new message
-receiveThread = threading.Thread(target=waitForNewClient, daemon=True)
+receiveThread = threading.Thread(target=waitForNewClient)
+receiveThread.daemon = True
 receiveThread.start()
 
 while True:
