@@ -68,11 +68,12 @@ def receiveMessageThread(conn):
             message = getMessage(data)
             messageParse(message, conn)
         except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
-            with user_list_lock:
-                activeUser.pop(conn)
-            conn.close()
+            # with user_list_lock:
+            #     activeUser.pop(conn)
+            # conn.close()
             with print_lock:
                 print('retreive Message ', str(err))
+                break
         except socket.timeout:
             with print_lock:
                 pass
