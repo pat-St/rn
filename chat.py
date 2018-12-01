@@ -76,6 +76,11 @@ def receiveMessageThread(conn):
             with print_lock:
                 pass
 
+def appendNewThreadInPool(conn):
+    t = threading.Thread(target=receiveMessageThread, args=(conn,))
+    t.daemon = True
+    threadPool.append(t)
+    t.start()
 
 def waitForNewClient():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -86,17 +91,14 @@ def waitForNewClient():
             if not threadRunning:
                 break
         conn, addr = sock.accept()
-        t = threading.Thread(target=receiveMessageThread, args=(conn,))
-        t.daemon = True
-        threadPool.append(t)
-        t.start()
+        appendNewThreadInPool(conn)
 
 
 def scanNetwork():
     sendNickname = 'S ' + username
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(120)
-    for i in 12, 63:  # LowestIP, HighestIP:
+    for i in 12, 64:  # LowestIP, HighestIP:
         newHostIP = HOST + str(i)
         try:
             sock.connect((newHostIP, PORT))
@@ -108,6 +110,7 @@ def scanNetwork():
                 print("otheraddress: " + str(otheraddress) + "\n")
                 othernickname = str(othernickname).split()[1]
                 addNewClientToList(sock, othernickname)
+                appendNewThreadInPool(sock)
             except socket.timeout as err:
                 print("scan send and retreive: " + str(err))
         except (
@@ -178,7 +181,6 @@ while True:
         break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
-        print(len(inputList))
         sendMessage(inputList[1], inputList[2])
     if inputMessage == 'L':
         listClients()
