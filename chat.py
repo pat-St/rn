@@ -135,15 +135,18 @@ def listClients():
 
 def quitConnection(conn):
     if activeUser.__contains__(conn):
-        activeUser.pop(conn)
+        with user_list_lock:
+            activeUser.pop(conn)
         conn.close()
 
 
 def quitAllConnections():
-    copy = activeUser.copy()
+    copy = ()
+    with user_list_lock:
+        copy = activeUser.copy()
     for key, value in copy.items():
         try:
-            print('Closing ...' + returnTargetAdress(key) + "from " + str(value) + "\n")
+            print('Closing retreive from address' + returnTargetAdress(key) + " : " + str(value) + "\n")
             key.send('Q'.encode("utf-8"))
             activeUser.pop(key)
             key.close()
