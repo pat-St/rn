@@ -17,7 +17,7 @@ print_lock = threading.Lock()
 user_list_lock = threading.Lock()
 
 thread_pool_lock = threading.Lock()
-threadPool = dict()
+threadPool = []
 
 thread_run_lock = threading.Lock()
 threadRunning = True
@@ -83,7 +83,7 @@ def receiveMessageThread(conn):
 def appendNewThreadInPool(conn):
     t = threading.Thread(target=receiveMessageThread, args=(conn,), daemon=True)
     with thread_pool_lock:
-        threadPool[conn] = t
+        threadPool.append(t)
     t.start()
 
 
@@ -149,8 +149,8 @@ def quitAllConnections():
     copy = ()
     with thread_run_lock:
         threadRunning = False
-    for key, value in threadPool.items():
-        value.join(2)
+    for worker in threadPool:
+        worker.join(2)
     with user_list_lock:
         copy = activeUser.copy()
     for key, value in copy.items():
