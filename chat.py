@@ -69,8 +69,9 @@ def receiveMessageThread(conn):
                 break
         try:
             data = conn.recv(1024).decode('utf-8')
-            message = getMessage(data)
-            messageParse(message, conn)
+            if data:
+                message = getMessage(data)
+                messageParse(message, conn)
         except socket.timeout:
             # with print_lock:
             #     print('retreive Message timeout')
