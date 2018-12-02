@@ -168,7 +168,7 @@ def quitAllConnections():
     with thread_run_lock:
         threadRunning = False
     for connection, worker in threadPool.items():
-        worker.join(2)
+        worker.join()
     with user_list_lock:
         copy = activeUser.copy()
     for key, value in copy.items():
@@ -201,7 +201,7 @@ while True:
     inputMessage = input(">")
     if inputMessage == 'Q':
         quitAllConnections()
-        receiveThread.join()
+        receiveThread.join(2)
         break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
