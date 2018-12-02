@@ -33,10 +33,12 @@ def returnNickName(input):
 
 
 def getMessage(input):
-    i = input.split()
-    if len(i) >= 2:
-        return str(i[0]), "".join(map(str, i[1:]))
-    return str(i[0]), ""
+    if not input:
+        i = input.split()
+        if len(i) >= 2:
+            return str(i[0]), "".join(map(str, i[1:]))
+        return str(i[0]), ""
+    return "",""
 
 
 def addNewClientToList(sock, nickname):
@@ -108,7 +110,7 @@ def scanNetworkRequest(newHostIP, sock):
         addNewClientToList(sock, othernickname)
         appendNewThreadInPool(sock)
     except socket.timeout as err:
-        print("scan send and retreive: " + str(err))
+        #print("scan send and retreive: " + str(err))
         sock.close()
     except (
             ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
