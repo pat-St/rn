@@ -91,15 +91,22 @@ def appendNewThreadInPool(conn):
 
 
 def waitForNewClient():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind(('0.0.0.0', PORT))
-    sock.listen()
-    while True:
-        with thread_run_lock:
-            if not threadRunning:
-                break
-        conn, addr = sock.accept()
-        appendNewThreadInPool(conn)
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(('0.0.0.0', PORT))
+        sock.listen()
+        while True:
+            with thread_run_lock:
+                if not threadRunning:
+                    sock.close()
+                    return
+            conn, addr = sock.accept()
+            appendNewThreadInPool(conn)
+    except OSError as err:
+        with print_lock:
+            print("unable to listen for new client " + str(err))
+        sock.close()
+        pass
 
 
 def scanNetworkRequest(newHostIP, sock):
@@ -194,7 +201,7 @@ while True:
     inputMessage = input(">")
     if inputMessage == 'Q':
         quitAllConnections()
-        receiveThread.join(1)
+        receiveThread.join()
         break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
