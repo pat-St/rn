@@ -119,7 +119,7 @@ def scanNetworkRequest(newHostIP, sock):
 
 
 def scanNetwork():
-    for i in range(15, 63):  # range(LowestIP, HighestIP):
+    for i in range(15, 64):  # range(LowestIP, HighestIP):
         newHostIP = HOST + str(i)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(2)
