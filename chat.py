@@ -52,9 +52,9 @@ def messageParse(message, conn):
         with print_lock:
             print("User [ " + str(activeUser.get(conn)) + " ] quit")
         quitConnection(conn)
-    if message == ('C', message[1:]):
+    if message == ('C', message[1]):
         with print_lock:
-            print("[" + str(activeUser.get(conn)) + "]: " + " ".join(message[1:]))
+            print("[" + str(activeUser.get(conn)) + "]: " + str(message[1]))
     if message == ('S', message[1]):
         with print_lock:
             print("Add user ", str(message[1]))
