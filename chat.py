@@ -34,11 +34,12 @@ def returnNickName(input):
 
 def getMessage(input):
     if not input:
-        i = input.split()
-        if len(i) >= 2:
-            return str(i[0]), "".join(map(str, i[1:]))
-        return str(i[0]), ""
-    return "",""
+        return "", ""
+    i = input.split()
+    if len(i) >= 2:
+        return str(i[0]), "".join(map(str, i[1:]))
+    return str(i[0]), ""
+
 
 
 def addNewClientToList(sock, nickname):
