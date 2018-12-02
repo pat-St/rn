@@ -60,6 +60,7 @@ def messageParse(message, conn):
 
 
 def receiveMessageThread(conn):
+    conn.settimeout(120)
     while True:
         with thread_run_lock:
             if not threadRunning:
@@ -68,15 +69,15 @@ def receiveMessageThread(conn):
             data = conn.recv(1024).decode('utf-8')
             message = getMessage(data)
             messageParse(message, conn)
-        except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
-            with print_lock:
-                print('retreive Message ', str(err))
-            conn.close()
-            break
         except socket.timeout:
             with print_lock:
                 print('retreive Message timeout')
             pass
+        except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
+            with print_lock:
+                print('retreive Message ', str(err))
+            break
+
 
 
 def appendNewThreadInPool(conn):
@@ -118,7 +119,7 @@ def scanNetworkRequest(newHostIP, sock):
 
 
 def scanNetwork():
-    for i in range(15, 62):  # range(LowestIP, HighestIP):
+    for i in range(15, 63):  # range(LowestIP, HighestIP):
         newHostIP = HOST + str(i)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(2)
