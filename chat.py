@@ -100,22 +100,32 @@ def waitForNewClient():
         appendNewThreadInPool(conn)
 
 
+def scanNetworkRequest(sock):
+    try:
+        sock.send(('S ' + username).encode("utf-8"))
+        othernickname = sock.recv(1024).decode("utf-8")
+        othernickname = str(othernickname).split()[1]
+        addNewClientToList(sock, othernickname)
+        appendNewThreadInPool(sock)
+    except socket.timeout as err:
+        print("scan send and retreive: " + str(err))
+    except (
+            ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
+            socket.timeout) as err:
+        print("scan Network: " + str(err))
+        pass
+
+
 def scanNetwork():
-    sendNickname = 'S ' + username
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(120)
-    for i in 15, 62:  # range(LowestIP, HighestIP):
+    sock.settimeout(10)
+    for i in range(15, 62):  # range(LowestIP, HighestIP):
         newHostIP = HOST + str(i)
         try:
             sock.connect((newHostIP, PORT))
-            try:
-                sock.send(sendNickname.encode("utf-8"))
-                othernickname = sock.recv(1024).decode("utf-8")
-                othernickname = str(othernickname).split()[1]
-                addNewClientToList(sock, othernickname)
-                appendNewThreadInPool(sock)
-            except socket.timeout as err:
-                print("scan send and retreive: " + str(err))
+            t = threading.Thread(target=scanNetworkRequest, args=(sock,))
+            t.daemon = True
+            t.start()
         except (
                 ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
                 socket.timeout) as err:
@@ -182,8 +192,8 @@ receiveThread.start()
 while True:
     inputMessage = input(">")
     if inputMessage == 'Q':
-        #with thread_run_lock:
-         #   threadRunning = False
+        # with thread_run_lock:
+        #   threadRunning = False
         quitAllConnections()
         receiveThread.join(1)
         break
