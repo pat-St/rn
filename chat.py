@@ -37,7 +37,7 @@ def getMessage(input):
         return "", ""
     i = input.split()
     if len(i) >= 2:
-        return str(i[0]), "".join(map(str, i[1:]))
+        return str(i[0]), "".join(str(x + " ") for x in i[1:])
     return str(i[0]), ""
 
 
@@ -54,7 +54,7 @@ def messageParse(message, conn):
         quitConnection(conn)
     if message == ('C', message[1]):
         with print_lock:
-            print("[ " + str(activeUser.get(conn)) + " ]: " + str(message[1]))
+            print("[" + str(activeUser.get(conn)) + "]: " + str(message[1]))
     if message == ('S', message[1]):
         with print_lock:
             print("Add user ", str(message[1]))
@@ -66,19 +66,18 @@ def receiveMessageThread(conn):
     while True:
         with thread_run_lock:
             if not threadRunning:
-                break
+                conn.close()
+                return
         try:
             data = conn.recv(1024).decode('utf-8')
             if data:
                 message = getMessage(data)
                 messageParse(message, conn)
         except socket.timeout:
-            # with print_lock:
-            #     print('retreive Message timeout')
             pass
         except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
-            with print_lock:
-                print('retreive Message ', str(err))
+            # with print_lock:
+            #     print('retreive Message ', str(err))
             break
 
 
@@ -112,12 +111,10 @@ def scanNetworkRequest(newHostIP, sock):
         addNewClientToList(sock, othernickname)
         appendNewThreadInPool(sock)
     except socket.timeout as err:
-        #print("scan send and retreive: " + str(err))
         sock.close()
     except (
             ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
-            socket.timeout) as err:
-        print("scan Network: " + str(err))
+            socket.timeout):
         sock.close()
 
 
@@ -169,7 +166,7 @@ def quitAllConnections():
         copy = activeUser.copy()
     for key, value in copy.items():
         try:
-            print('Closing retreive for address ' + returnTargetAdress(key) + " : " + str(value) + "\n")
+            print('Closing receive for address ' + str(value) + "\n")
             key.send('Q'.encode("utf-8"))
             with user_list_lock:
                 activeUser.pop(key)
@@ -183,7 +180,7 @@ def quitAllConnections():
 # start point
 while True:
     username = input("Set a username:")
-    userinput = input("is ${username} right? [Y/n] ")
+    userinput = input("is " + str(username) + " right? [Y/n] ")
     if userinput == "Y" or userinput == "":
         break
 # scan all client in network
@@ -196,8 +193,6 @@ receiveThread.start()
 while True:
     inputMessage = input(">")
     if inputMessage == 'Q':
-        # with thread_run_lock:
-        #   threadRunning = False
         quitAllConnections()
         receiveThread.join(1)
         break
