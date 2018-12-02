@@ -138,7 +138,7 @@ def sendMessage(nickname, message):
     for key, value in activeUser.items():
         if value == nickname:
             try:
-                key.send(('C ' + "".join(message)).encode("utf-8"))
+                key.send(('C ' + " ".join(message)).encode("utf-8"))
             except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
                     socket.timeout) as err:
                 print("send Message Error: " + str(err))
