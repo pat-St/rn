@@ -45,7 +45,7 @@ def addNewClientToList(sock, nickname):
     with user_list_lock:
         activeUser[sock] = nickname
     with print_lock:
-        print("found new user " + nickname + "\n")
+        print("found new user " + nickname)
 
 
 def messageParse(message, conn):
@@ -147,7 +147,7 @@ def sendMessage(nickname, message):
 
 def listClients():
     for key, value in activeUser.items():
-        print("found user " + str(value) + " from address " + returnTargetAdress(key) + "\n")
+        print("user " + str(value) + " : " + returnTargetAdress(key))
 
 
 def quitConnection(conn):
@@ -166,14 +166,14 @@ def quitAllConnections():
         copy = activeUser.copy()
     for key, value in copy.items():
         try:
-            print('Closing receive for address ' + str(value) + "\n")
+            print('Closing receive for address ' + str(value))
             key.send('Q'.encode("utf-8"))
             with user_list_lock:
                 activeUser.pop(key)
             key.close()
         except (socket.timeout, OSError) as err:
             with print_lock:
-                print('quit timed out at ', str(err) + "\n")
+                print('quit timed out at ', str(err))
             key.close()
 
 
