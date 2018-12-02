@@ -41,10 +41,11 @@ def getMessage(input):
     return str(i[0]), ""
 
 
-
 def addNewClientToList(sock, nickname):
     with user_list_lock:
         activeUser[sock] = nickname
+    with print_lock:
+        print("found new user " + nickname + "\n")
 
 
 def messageParse(message, conn):
@@ -79,7 +80,6 @@ def receiveMessageThread(conn):
             # with print_lock:
             #     print('retreive Message ', str(err))
             break
-
 
 
 def appendNewThreadInPool(conn):
@@ -124,7 +124,7 @@ def scanNetwork():
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(2)
         try:
-            t = threading.Thread(target=scanNetworkRequest, args=(newHostIP,sock,))
+            t = threading.Thread(target=scanNetworkRequest, args=(newHostIP, sock,))
             t.daemon = True
             t.start()
         except (
