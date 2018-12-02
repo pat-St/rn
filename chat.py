@@ -170,7 +170,8 @@ def sendGroupMessage(groupname, message):
 
 
 def addUserToGroup(groupname, users):
-    current_users = groupClient.get(groupname)
+    with group_lock:
+        current_users = groupClient.get(groupname)
     if not current_users:
         groupClient[groupname] = users
     else:
@@ -180,7 +181,7 @@ def addUserToGroup(groupname, users):
 
 def delUsersFromGroup(user):
     with group_lock:
-        copy = groupClient.copy
+        copy = groupClient.copy()
     for group_name, user_in_group in copy.items():
         if user_in_group is user:
             with group_lock:
@@ -193,6 +194,10 @@ def listClients():
     for key, value in activeUser.items():
         print("user " + str(value) + " : " + returnTargetAdress(key))
 
+
+def listGroup():
+    for groupname, user in groupClient.items():
+        print("G: " + groupname + " U: " + " ".join(user))
 
 def quitConnection(conn):
     with user_list_lock:
@@ -220,10 +225,10 @@ def quitAllConnections():
             with print_lock:
                 print('quit timed out at ', str(err))
             key.close()
-    for connection, worker in copyPool.items():
-        threadPool.pop(worker)
-        if worker.is_alive():
-            worker.join()
+    # for connection, worker in copyPool.items():
+    #     threadPool.pop(worker)
+    #     if worker.is_alive():
+    #         worker.join()
 
 
 # start point
@@ -250,6 +255,7 @@ while True:
         sendMessage(inputList[1], inputList[2:])
     if inputMessage == 'L':
         listClients()
+        listGroup()
     if inputMessage.startswith('G'):
         inputList = inputMessage.split()
         sendGroupMessage(inputList[1], inputList[2:])
