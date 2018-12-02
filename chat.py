@@ -71,10 +71,12 @@ def receiveMessageThread(conn):
         except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
             with print_lock:
                 print('retreive Message ', str(err))
-                break
+            conn.close()
+            break
         except socket.timeout:
             with print_lock:
-                pass
+                print('retreive Message timeout')
+            pass
 
 
 def appendNewThreadInPool(conn):
@@ -97,8 +99,9 @@ def waitForNewClient():
         appendNewThreadInPool(conn)
 
 
-def scanNetworkRequest(sock):
+def scanNetworkRequest(newHostIP, sock):
     try:
+        sock.connect((newHostIP, PORT))
         sock.send(('S ' + username).encode("utf-8"))
         othernickname = sock.recv(1024).decode("utf-8")
         othernickname = str(othernickname).split()[1]
@@ -106,21 +109,21 @@ def scanNetworkRequest(sock):
         appendNewThreadInPool(sock)
     except socket.timeout as err:
         print("scan send and retreive: " + str(err))
+        sock.close()
     except (
             ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
             socket.timeout) as err:
         print("scan Network: " + str(err))
-        pass
+        sock.close()
 
 
 def scanNetwork():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(10)
     for i in range(15, 62):  # range(LowestIP, HighestIP):
         newHostIP = HOST + str(i)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
         try:
-            sock.connect((newHostIP, PORT))
-            t = threading.Thread(target=scanNetworkRequest, args=(sock,))
+            t = threading.Thread(target=scanNetworkRequest, args=(newHostIP,sock,))
             t.daemon = True
             t.start()
         except (
@@ -149,7 +152,7 @@ def listClients():
 def quitConnection(conn):
     with user_list_lock:
         activeUser.pop(conn)
-    # conn.close()
+    conn.close()
 
 
 def quitAllConnections():
