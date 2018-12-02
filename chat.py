@@ -18,9 +18,6 @@ activeUser = dict()
 thread_pool_lock = threading.Lock()
 threadPool = dict()
 
-group_lock = threading.Lock()
-groupClient = dict()
-
 thread_run_lock = threading.Lock()
 threadRunning = True
 
@@ -55,7 +52,6 @@ def messageParse(message, conn):
         with print_lock:
             print("User [ " + str(activeUser.get(conn)) + " ] quit")
         quitConnection(conn)
-        delUsersFromGroup(conn)
     if message == ('C', message[1]):
         with print_lock:
             print("[" + str(activeUser.get(conn)) + "]: " + str(message[1]))
@@ -65,13 +61,8 @@ def messageParse(message, conn):
         conn.send(('S ' + username).encode("utf-8"))
         addNewClientToList(conn, str(message[1]))
     if message == ('G', message[1]):
-        group_message = getMessage(message)
-        list_of_members = groupClient.get(group_message[0])
-        if not list_of_members:
-            groupClient[group_message[0]] = (str(activeUser[conn]))
-        else:
-            list_of_members.append(str(activeUser[conn]))
-            groupClient[group_message[0]] = list_of_members
+        with print_lock:
+            print("[G|" + str(activeUser.get(conn)) + "]: " + str(message[1]))
 
 
 def receiveMessageThread(conn):
@@ -152,7 +143,18 @@ def scanNetwork():
             pass
 
 
-def sendMessage(message):
+def sendMessage(user, message):
+    for key, value in activeUser.items():
+        if value == user:
+            try:
+                key.send(('C ' + " ".join(message)).encode("utf-8"))
+            except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
+                    socket.timeout) as err:
+                print("send Message Error: " + str(err))
+                pass
+
+
+def sendGroupMessage(message):
     for key, value in activeUser.items():
         try:
             key.send(('C ' + " ".join(message)).encode("utf-8"))
@@ -160,19 +162,6 @@ def sendMessage(message):
                 socket.timeout) as err:
             print("send Message Error: " + str(err))
             pass
-
-
-def sendGroupMessage(groupname, message):
-    with group_lock:
-        users = groupClient.get(groupname)
-    for key, value in activeUser.items():
-        if value in users:
-            try:
-                key.send(('C ' + " ".join(message)).encode("utf-8"))
-            except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
-                    socket.timeout) as err:
-                print("send Message Error: " + str(err))
-                pass
 
 
 def quitConnection(conn):
@@ -201,42 +190,9 @@ def quitAllConnections():
             key.close()
 
 
-def addUserToGroup(groupname, users):
-    with group_lock:
-        current_users = groupClient.get(groupname)
-    if not current_users:
-        groupClient[groupname] = users
-    else:
-        current_users += users
-        groupClient[groupname] = current_users
-
-
-def delUsersFromGroup(conn):
-    with user_list_lock:
-        user = activeUser.get(conn)
-    with group_lock:
-        copy = groupClient.copy()
-    for group_name, user_in_group in copy.items():
-        if user_in_group is user:
-            with group_lock:
-                current_users = groupClient.get(group_name)
-                current_users.remove(user)
-                groupClient[group_name] = current_users
-
-
-def delGroup(groupname):
-    with group_lock:
-        groupClient.pop(groupname)
-
-
 def listClients():
     for key, value in activeUser.items():
         print("user " + str(value) + " : " + returnTargetAdress(key))
-
-
-def listGroup():
-    for groupname, user in groupClient.items():
-        print("G: " + groupname + " U: " + " ".join(user))
 
 
 # start point
@@ -260,16 +216,9 @@ while True:
         break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
-        sendMessage(inputList[1:])
+        sendMessage(inputList[1], inputList[2:])
     if inputMessage == 'L':
         listClients()
-        listGroup()
     if inputMessage.startswith('G'):
         inputList = inputMessage.split()
-        sendGroupMessage(inputList[1], inputList[2:])
-    if inputMessage.startswith('new'):
-        inputList = inputMessage.split()
-        addUserToGroup(inputList[1], inputList[2:])
-    if inputMessage.startswith('del'):
-        inputList = inputMessage.split()
-        delGroup(inputList[1])
+        sendGroupMessage(inputList[1:])
