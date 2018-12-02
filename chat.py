@@ -17,7 +17,7 @@ print_lock = threading.Lock()
 user_list_lock = threading.Lock()
 
 thread_pool_lock = threading.Lock()
-threadPool = []
+threadPool = dict()
 
 thread_run_lock = threading.Lock()
 threadRunning = True
@@ -69,9 +69,6 @@ def receiveMessageThread(conn):
             message = getMessage(data)
             messageParse(message, conn)
         except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
-            # with user_list_lock:
-            #     activeUser.pop(conn)
-            # conn.close()
             with print_lock:
                 print('retreive Message ', str(err))
                 break
@@ -84,7 +81,7 @@ def appendNewThreadInPool(conn):
     t = threading.Thread(target=receiveMessageThread, args=(conn,))
     t.daemon = True
     with thread_pool_lock:
-        threadPool.append(t)
+        threadPool[conn] = t
     t.start()
 
 
@@ -152,14 +149,14 @@ def listClients():
 def quitConnection(conn):
     with user_list_lock:
         activeUser.pop(conn)
-    conn.close()
+    # conn.close()
 
 
 def quitAllConnections():
     copy = ()
     with thread_run_lock:
         threadRunning = False
-    for worker in threadPool:
+    for connection, worker in threadPool.items():
         worker.join(2)
     with user_list_lock:
         copy = activeUser.copy()
