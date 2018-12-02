@@ -37,7 +37,7 @@ def getMessage(input):
         return "", ""
     i = input.split()
     if len(i) >= 2:
-        return str(i[0]), "".join(str(x + " ") for x in i[1:])
+        return str(i[0]), "".join(i[1:])
     return str(i[0]), ""
 
 
@@ -138,7 +138,7 @@ def sendMessage(nickname, message):
     for key, value in activeUser.items():
         if value == nickname:
             try:
-                key.send(('C ' + message).encode("utf-8"))
+                key.send(('C ' + "".join(message)).encode("utf-8"))
             except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
                     socket.timeout) as err:
                 print("send Message Error: " + str(err))
@@ -198,6 +198,6 @@ while True:
         break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
-        sendMessage(inputList[1], inputList[2])
+        sendMessage(inputList[1], inputList[1:])
     if inputMessage == 'L':
         listClients()
