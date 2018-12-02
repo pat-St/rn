@@ -60,7 +60,6 @@ def messageParse(message, conn):
 
 
 def receiveMessageThread(conn):
-    conn.settimeout(120)
     while True:
         with thread_run_lock:
             if not threadRunning:
@@ -70,8 +69,8 @@ def receiveMessageThread(conn):
             message = getMessage(data)
             messageParse(message, conn)
         except socket.timeout:
-            with print_lock:
-                print('retreive Message timeout')
+            # with print_lock:
+            #     print('retreive Message timeout')
             pass
         except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
             with print_lock:
