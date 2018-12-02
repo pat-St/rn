@@ -167,8 +167,6 @@ def quitAllConnections():
     copy = ()
     with thread_run_lock:
         threadRunning = False
-    for connection, worker in threadPool.items():
-        worker.join()
     with user_list_lock:
         copy = activeUser.copy()
     for key, value in copy.items():
@@ -182,6 +180,9 @@ def quitAllConnections():
             with print_lock:
                 print('quit timed out at ', str(err))
             key.close()
+    for connection, worker in threadPool.items():
+        if worker.is_alive():
+            worker.join()
 
 
 # start point
