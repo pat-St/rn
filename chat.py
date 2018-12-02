@@ -55,6 +55,7 @@ def messageParse(message, conn):
         with print_lock:
             print("User [ " + str(activeUser.get(conn)) + " ] quit")
         quitConnection(conn)
+        delUsersFromGroup(conn)
     if message == ('C', message[1]):
         with print_lock:
             print("[" + str(activeUser.get(conn)) + "]: " + str(message[1]))
@@ -136,7 +137,7 @@ def scanNetworkRequest(newHostIP, sock):
 
 
 def scanNetwork():
-    for i in range(15, 64):  # range(LowestIP, HighestIP):
+    for i in range(1, 150):  # range(LowestIP, HighestIP):
         newHostIP = HOST + str(i)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(2)
@@ -151,9 +152,21 @@ def scanNetwork():
             pass
 
 
-def sendMessage(nickname, message):
+def sendMessage(message):
     for key, value in activeUser.items():
-        if value == nickname:
+        try:
+            key.send(('C ' + " ".join(message)).encode("utf-8"))
+        except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
+                socket.timeout) as err:
+            print("send Message Error: " + str(err))
+            pass
+
+
+def sendGroupMessage(groupname, message):
+    with group_lock:
+        users = groupClient.get(groupname)
+    for key, value in activeUser.items():
+        if value in users:
             try:
                 key.send(('C ' + " ".join(message)).encode("utf-8"))
             except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
@@ -162,11 +175,30 @@ def sendMessage(nickname, message):
                 pass
 
 
-def sendGroupMessage(groupname, message):
-    with group_lock:
-        users = groupClient.get(groupname)
-    for u in users:
-        sendMessage(u, message)
+def quitConnection(conn):
+    with user_list_lock:
+        activeUser.pop(conn)
+    conn.close()
+
+
+def quitAllConnections():
+    with thread_run_lock:
+        threadRunning = False
+    with user_list_lock:
+        copy = activeUser.copy()
+    for key, value in copy.items():
+        try:
+            print('Closing receive for address ' + str(value))
+            key.send('Q'.encode("utf-8"))
+            with user_list_lock:
+                activeUser.pop(key)
+            with thread_pool_lock:
+                threadPool.pop(key)
+            key.close()
+        except (socket.timeout, OSError) as err:
+            with print_lock:
+                print('quit timed out at ', str(err))
+            key.close()
 
 
 def addUserToGroup(groupname, users):
@@ -179,7 +211,9 @@ def addUserToGroup(groupname, users):
         groupClient[groupname] = current_users
 
 
-def delUsersFromGroup(user):
+def delUsersFromGroup(conn):
+    with user_list_lock:
+        user = activeUser.get(conn)
     with group_lock:
         copy = groupClient.copy()
     for group_name, user_in_group in copy.items():
@@ -190,6 +224,11 @@ def delUsersFromGroup(user):
                 groupClient[group_name] = current_users
 
 
+def delGroup(groupname):
+    with group_lock:
+        groupClient.pop(groupname)
+
+
 def listClients():
     for key, value in activeUser.items():
         print("user " + str(value) + " : " + returnTargetAdress(key))
@@ -198,37 +237,6 @@ def listClients():
 def listGroup():
     for groupname, user in groupClient.items():
         print("G: " + groupname + " U: " + " ".join(user))
-
-def quitConnection(conn):
-    with user_list_lock:
-        activeUser.pop(conn)
-    conn.close()
-
-
-def quitAllConnections():
-    copy = ()
-    copyPool = ()
-    with thread_run_lock:
-        threadRunning = False
-    with thread_pool_lock:
-        copyPool = threadPool.copy()
-    with user_list_lock:
-        copy = activeUser.copy()
-    for key, value in copy.items():
-        try:
-            print('Closing receive for address ' + str(value))
-            key.send('Q'.encode("utf-8"))
-            with user_list_lock:
-                activeUser.pop(key)
-            key.close()
-        except (socket.timeout, OSError) as err:
-            with print_lock:
-                print('quit timed out at ', str(err))
-            key.close()
-    # for connection, worker in copyPool.items():
-    #     threadPool.pop(worker)
-    #     if worker.is_alive():
-    #         worker.join()
 
 
 # start point
@@ -252,7 +260,7 @@ while True:
         break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
-        sendMessage(inputList[1], inputList[2:])
+        sendMessage(inputList[1:])
     if inputMessage == 'L':
         listClients()
         listGroup()
@@ -262,3 +270,6 @@ while True:
     if inputMessage.startswith('new'):
         inputList = inputMessage.split()
         addUserToGroup(inputList[1], inputList[2:])
+    if inputMessage.startswith('del'):
+        inputList = inputMessage.split()
+        delGroup(inputList[1])
