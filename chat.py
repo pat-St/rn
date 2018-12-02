@@ -4,20 +4,22 @@ import threading
 
 HOST = '192.168.2.'  # '141.37.168.'
 PORT = 50000
-server_activity_period = 30
 ADDR = (HOST, PORT)
-pool_size = 5
 
 LowestIP = 1
 HighestIP = 63
 
-username = ""
-activeUser = dict()
 print_lock = threading.Lock()
+username = ""
+
 user_list_lock = threading.Lock()
+activeUser = dict()
 
 thread_pool_lock = threading.Lock()
 threadPool = dict()
+
+group_lock = threading.Lock()
+groupClient = dict()
 
 thread_run_lock = threading.Lock()
 threadRunning = True
@@ -61,6 +63,14 @@ def messageParse(message, conn):
             print("Add user ", str(message[1]))
         conn.send(('S ' + username).encode("utf-8"))
         addNewClientToList(conn, str(message[1]))
+    if message == ('G', message[1]):
+        group_message = getMessage(message)
+        list_of_members = groupClient.get(group_message[0])
+        if not list_of_members:
+            groupClient[group_message[0]] = (str(activeUser[conn]))
+        else:
+            list_of_members.append(str(activeUser[conn]))
+            groupClient[group_message[0]] = list_of_members
 
 
 def receiveMessageThread(conn):
@@ -152,6 +162,33 @@ def sendMessage(nickname, message):
                 pass
 
 
+def sendGroupMessage(groupname, message):
+    with group_lock:
+        users = groupClient.get(groupname)
+    for u in users:
+        sendMessage(u, message)
+
+
+def addUserToGroup(groupname, users):
+    current_users = groupClient.get(groupname)
+    if not current_users:
+        groupClient[groupname] = users
+    else:
+        current_users += users
+        groupClient[groupname] = current_users
+
+
+def delUsersFromGroup(user):
+    with group_lock:
+        copy = groupClient.copy
+    for group_name, user_in_group in copy.items():
+        if user_in_group is user:
+            with group_lock:
+                current_users = groupClient.get(group_name)
+                current_users.remove(user)
+                groupClient[group_name] = current_users
+
+
 def listClients():
     for key, value in activeUser.items():
         print("user " + str(value) + " : " + returnTargetAdress(key))
@@ -165,8 +202,11 @@ def quitConnection(conn):
 
 def quitAllConnections():
     copy = ()
+    copyPool = ()
     with thread_run_lock:
         threadRunning = False
+    with thread_pool_lock:
+        copyPool = threadPool.copy()
     with user_list_lock:
         copy = activeUser.copy()
     for key, value in copy.items():
@@ -180,7 +220,8 @@ def quitAllConnections():
             with print_lock:
                 print('quit timed out at ', str(err))
             key.close()
-    for connection, worker in threadPool.items():
+    for connection, worker in copyPool.items():
+        threadPool.pop(worker)
         if worker.is_alive():
             worker.join()
 
@@ -209,3 +250,9 @@ while True:
         sendMessage(inputList[1], inputList[2:])
     if inputMessage == 'L':
         listClients()
+    if inputMessage.startswith('G'):
+        inputList = inputMessage.split()
+        sendGroupMessage(inputList[1], inputList[2:])
+    if inputMessage.startswith('new'):
+        inputList = inputMessage.split()
+        addUserToGroup(inputList[1], inputList[2:])
