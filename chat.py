@@ -1,7 +1,8 @@
 import socket
 import threading
+import time
 
-HOST = '192.168.2.'  # '141.37.168.'
+HOST = '141.37.168.'
 PORT = 50000
 ADDR = (HOST, PORT)
 
@@ -35,7 +36,7 @@ def getMessage(input):
         return "", ""
     i = input.split()
     if len(i) >= 2:
-        return str(i[0]), " ".join(i[1:])
+        return str(i[0]).upper(), " ".join(i[1:])
     return str(i[0]), ""
 
 
@@ -80,6 +81,9 @@ def receiveMessageThread(conn):
         except (ConnectionResetError, ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, OSError) as err:
             # with print_lock:
             #     print('retreive Message ', str(err))
+            with user_list_lock:
+                activeUser.pop(conn)
+            conn.close()
             break
 
 
@@ -92,6 +96,7 @@ def appendNewThreadInPool(conn):
 
 
 def waitForNewClient():
+    time.sleep(5)
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(('0.0.0.0', PORT))
@@ -127,7 +132,7 @@ def scanNetworkRequest(newHostIP, sock):
 
 
 def scanNetwork():
-    for i in range(1, 150):  # range(LowestIP, HighestIP):
+    for i in range(LowestIP, HighestIP):
         newHostIP = HOST + str(i)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(2)
@@ -145,6 +150,8 @@ def scanNetwork():
 def sendMessage(user, message):
     for key, value in activeUser.items():
         if value == user:
+            with print_lock:
+                print("send Message to: " + str(value))
             try:
                 key.send(('C ' + " ".join(message)).encode("utf-8"))
             except (ConnectionRefusedError, ConnectionAbortedError, BrokenPipeError, IndexError, OSError,
@@ -177,7 +184,7 @@ def quitAllConnections():
     for key, value in copy.items():
         try:
             print('Closing receive for address ' + str(value))
-            key.send('Q'.encode("utf-8"))
+            key.send(('Q ' + username).encode("utf-8"))
             with user_list_lock:
                 activeUser.pop(key)
             with thread_pool_lock:
@@ -211,7 +218,7 @@ while True:
     inputMessage = input(">")
     if inputMessage == 'Q':
         quitAllConnections()
-        receiveThread.join(2)
+        #receiveThread.join(2)
         break
     if inputMessage.startswith('C'):
         inputList = inputMessage.split()
