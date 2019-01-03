@@ -3,19 +3,24 @@ from collections import deque
 
 class lossy_packet_handler:
     __packet_payload: deque = deque()
-    __read_write_mutex = Lock()
+    __read_write_mutex: Lock = Lock()
 
     def __init__(self):
         self.data = []
 
     def receive(self, packet):
-        with self.__read_write_mutex:
-            self.__packet_payload.append(packet)
+        self.__read_write_mutex.acquire()
+        self.__packet_payload.append(packet)
+        self.__read_write_mutex.release()
 
     def get_packet(self):
-        with self.__read_write_mutex:
-            return self.__packet_payload.popleft()
+        self.__read_write_mutex.acquire()
+        tmp = self.__packet_payload.popleft()
+        self.__read_write_mutex.release()
+        return tmp
 
     def stored_buffer_size(self):
-        with self.__read_write_mutex:
-            return self.__packet_payload.__len__()
+        self.__read_write_mutex.acquire()
+        tmp = len(self.__packet_payload)
+        self.__read_write_mutex.release()
+        return tmp
