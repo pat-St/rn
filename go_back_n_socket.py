@@ -4,6 +4,7 @@ from lossy_udp_socket import lossy_udp_socket
 from lossy_packet_handler import lossy_packet_handler
 from datetime import datetime, timedelta
 
+
 class go_back_n_socket:
     # connection config
     __des_ip: str
@@ -18,7 +19,7 @@ class go_back_n_socket:
     # sending config
     __segment_size: int = 1468
     __window_size: int
-    __send_timeout: int = 1
+    __send_timeout: int = 0.5
 
     # buffer for sender
     __send_packets: dict = {}
@@ -61,7 +62,8 @@ class go_back_n_socket:
 
     def __drop_key_from_receive_buffer(self, seq_nr: int):
         self.__queue_write_lock.acquire()
-        self.__receive_queue_msg.pop(seq_nr, None)
+        if seq_nr in self.__receive_queue_msg:
+            self.__receive_queue_msg.pop(seq_nr)
         self.__queue_write_lock.release()
 
     # received and response packtes getter setter
@@ -145,24 +147,29 @@ class go_back_n_socket:
 
     def send(self, msg: bytes):
         # send window size packets parts in a loop
+        self.__reset_buffer()
         self.__prepare_msg_for_send(msg)
 
     def recv(self, bytecount: int):
+        while len(self.__read_from_receive_buffer()) != 0:
+            time.sleep(0.5)
         received_msg_buffer = self.__get_stored_received_msg()
         return_msg = b""
         for key, value in received_msg_buffer.items():
-            return_msg += value
+            if key >= len(return_msg) or key == 0:
+                return_msg += value
             self.__drop_stored_received_msg(key)
         bytecount = min(bytecount, len(return_msg))
+        self.__reset_buffer()
         return return_msg[:bytecount]
 
     def stop(self):
         self.__stop_thread = True
-        self.__send_packets_worker.join(1)
-        self.__pull_payload_worker.join(1)
-        self.__receiver_payload_worker.join(1)
-        self.__send_timeout_worker.join(1)
-        # self.__response_payload_worker.join(1)
+        self.__send_packets_worker.join()
+        self.__pull_payload_worker.join()
+        self.__receiver_payload_worker.join()
+        self.__send_timeout_worker.join()
+        self.connection.stop()
         print("*************************************************")
         print("send buffer " + str(self.__send_packets))
         print("receive buffer " + str(self.__receive_queue_msg))
@@ -170,7 +177,12 @@ class go_back_n_socket:
         print("response buffer " + str(self.__response_from_receiver))
         print("stored buffer " + str(self.__stored_received_msg_for_read))
         print("*************************************************")
-        self.connection.stop()
+
+    def has_recv(self, bytescount: int):
+        current_bytes: int = 0
+        for key, value in self.__get_stored_received_msg().items():
+            current_bytes += len(value)
+        return current_bytes == bytescount
 
     def __start_worker_thread(self):
         t = Thread(target=self.__recv_packets_worker)
@@ -190,6 +202,14 @@ class go_back_n_socket:
         self.__send_timeout_worker = t5
         t5.start()
 
+    def __reset_buffer(self):
+        self.__send_packets = {}
+        self.__receive_queue_msg = {}
+        self.__send_packets_timer = {}
+        self.__response_from_receiver = set()
+        self.__receive_queue_msg = {}
+        self.__stored_received_msg_for_read = {}
+
     def __recv_packets_worker(self):
         sleep_time = 0.2
         while not self.__stop_thread:
@@ -200,7 +220,7 @@ class go_back_n_socket:
             else:
                 time.sleep(sleep_time)
                 if sleep_time < 2.0:
-                    sleep_time += 0.3
+                    sleep_time += 0.1
 
     def __store_received_msg_in_buffer(self, payload: bytes):
         tmp_header = payload[:32].decode("utf-8").split()
@@ -224,6 +244,7 @@ class go_back_n_socket:
 
     def __split_payload_in_seg(self, payload: bytes):
         if len(payload) > self.__segment_size:
+            assert len(payload) == len(payload[:self.__segment_size]) + len(payload[self.__segment_size:])
             return payload[:self.__segment_size], payload[self.__segment_size:]
         return payload, b""
 
@@ -234,15 +255,15 @@ class go_back_n_socket:
         return count_packets
 
     def __prepare_msg_for_send(self, payload: bytes):
-        # count_packets: int = self.__count_segment_packets(payload)
-        # print("send ", count_packets, "x packets")
         payload_res: (bytes, bytes) = (b"", payload)
         current_seg_nr: int = 0
         while len(payload_res[1]) != 0:
             payload_res = self.__split_payload_in_seg(payload_res[1])
             value: bytes = payload_res[0]
             self.__set_send_packets_to_queue(current_seg_nr, value)
-            current_seg_nr += self.__segment_size
+            if current_seg_nr == 0:
+                current_seg_nr += 1
+            current_seg_nr += len(value)
 
     def __create_msg_header_filler(self, size: int):
         if size <= 0:
@@ -271,33 +292,35 @@ class go_back_n_socket:
                 if current_send_window is not None:
                     if self.__check_packets_time_out():
                         current_send_window = self.__create_time_out_window_bundle()
+                        # print("send :", str(list(current_send_window)))
                         self.__send_window(current_send_window)
                     else:
-                        if self.__has_ack_response(current_send_window):
-                            self.__removed_ack_packets()
-                            tmp_list = self.__get_send_packets_from_queue()
-                            for key in list(current_send_window):
-                                if key in tmp_list:
-                                    tmp_list.pop(key)
-                                if key not in tmp_list:
-                                    current_send_window.pop(key)
-                            if len(tmp_list) > 0:
-                                current_send_window = self.__create_packet_bundle_from_seq_nr(min(list(tmp_list)))
-                                assert len(current_send_window) <= 4
+                        ack_for_current_window = self.__window_ack_response(current_send_window)
+                        if len(ack_for_current_window) > 0:
+                            self.__removed_ack_packets(
+                                delete_full_window=(ack_for_current_window == current_send_window),
+                                optional_windows=ack_for_current_window.copy())
+                            if self.__get_lowest_seq_nr_send_packets() is not None:
+                                current_send_window = self.__create_packet_bundle_from_seq_nr(
+                                    self.__get_lowest_seq_nr_send_packets())
+                                assert len(current_send_window) <= self.__window_size
+                                # print("send :", str(list(current_send_window)))
                                 self.__send_window(current_send_window)
-                        else:
-                            time.sleep(0.1)
+
+                        # else:
+                        #     time.sleep(0.1)
                 else:
                     first_seq_nr = self.__get_lowest_seq_nr_send_packets()
                     current_send_window = self.__create_packet_bundle_from_seq_nr(first_seq_nr)
-                    assert len(current_send_window) <= 4
+                    # assert len(current_send_window) <= self.__window_size
+                    # print("send :", str(list(current_send_window)))
                     self.__send_window(current_send_window)
                     # time.sleep(sleep_time)
             else:
                 current_send_window = None
                 time.sleep(sleep_time)
                 if sleep_time < 2.0:
-                    sleep_time += 0.3
+                    sleep_time += 0.1
 
     def __check_packets_time_out(self):
         for seq_nr, (time_out, _) in self.__get_packets_timer().items():
@@ -311,32 +334,42 @@ class go_back_n_socket:
                 return self.__create_packet_bundle_from_seq_nr(seq_nr)
         return {}
 
-    def __has_ack_response(self, current_window: dict):
+    def __window_ack_response(self, current_window: dict):
+        tmp_response: dict = {}
         for seq_nr, value in current_window.items():
             if seq_nr in self.__read_from_response_buffer():
-                return True
-        return False
+                tmp_response[seq_nr] = value
+        return tmp_response
 
-    def __removed_ack_packets(self):
-        response_is_time_out = self.__get_packets_timer()
+    def __removed_ack_packets(self, delete_full_window=False, optional_windows: dict = {}):
+        if delete_full_window:
+            for key in list(optional_windows):
+                self.__drop_send_packets_from_queue(key)
+                self.__drop_item_from_response_buffer(key)
+                self.__drop_packets_timer(key)
+
+        # delete already ack response
         tmp_response_set = self.__read_from_response_buffer()
         for seq_nr in tmp_response_set:
+            if self not in self.__get_send_packets_from_queue():
+                self.__drop_item_from_response_buffer(seq_nr)
+        response_is_time_out = self.__get_packets_timer()
+        tmp_response_set = self.__read_from_response_buffer()
+
+        # clean timeout for ack packets
+        for seq_nr in tmp_response_set:
+            self.__drop_item_from_response_buffer(seq_nr)
             if seq_nr in response_is_time_out:
                 if response_is_time_out[seq_nr][0] is False:
                     self.__drop_packets_timer(seq_nr)
-                    # print("remove from timer " + str(seq_nr))
-            if seq_nr is self.__get_lowest_seq_nr_send_packets():
+            if seq_nr == self.__get_lowest_seq_nr_send_packets():
                 self.__drop_send_packets_from_queue(seq_nr)
-                self.__drop_item_from_response_buffer(seq_nr)
-                # print("remove from response " + str(seq_nr))
-                # print("remove from send buffer " + str(seq_nr))
 
     def __create_packet_bundle_from_seq_nr(self, seq_nr):
         tmp_bundle: dict = {}
         count_at_this_point = False
-        send_packets: dict = self.__get_send_packets_from_queue()
-        for key, value in send_packets.items():
-            if count_at_this_point and len(tmp_bundle) < 4:
+        for key, value in self.__get_send_packets_from_queue().items():
+            if count_at_this_point and len(tmp_bundle) < self.__window_size:
                 tmp_bundle[key] = value
             if key == seq_nr:
                 tmp_bundle[key] = value
@@ -348,7 +381,7 @@ class go_back_n_socket:
             packet_to_send: bytes = self.__create_msg_for_send(key, 0, value)
             self.__push_timeout_worker_in_queue(key)
             self.connection.send(packet_to_send)
-            # print("send ", str(packet_to_send.split()[:3]))
+            # print("send: " + str(key) + ": " + str(len(value)))
 
     def __push_timeout_worker_in_queue(self, seq_nr: int):
         self.__set_packets_timer(seq_nr=seq_nr, is_timeout=False, timestamp=datetime.utcnow())
@@ -373,7 +406,7 @@ class go_back_n_socket:
             else:
                 time.sleep(sleep_time)
                 if sleep_time < 2.0:
-                    sleep_time += 0.3
+                    sleep_time += 0.1
 
     def __receiver_payload_handler(self):
         sleep_time = 0.2
@@ -383,15 +416,15 @@ class go_back_n_socket:
             if len(self.__read_from_receive_buffer()) > 0:
                 current_response = self.__read_from_receive_buffer()
                 for seq_nr, value in current_response.items():
-                    if seq_nr is not None:
-                        self.__send_ack_nr_response(seq_nr)
-                        self.__set_stored_received_msg(seq_nr, value)
-                        self.__drop_key_from_receive_buffer(seq_nr)
-                        # print("response for ", next_expected_seq_nr)
+                    # if seq_nr is not None:
+                    self.__send_ack_nr_response(seq_nr)
+                    self.__set_stored_received_msg(seq_nr, value)
+                    self.__drop_key_from_receive_buffer(seq_nr)
+                    # print("response: " + str(seq_nr))
             else:
                 time.sleep(sleep_time)
                 if sleep_time < 2.0:
-                    sleep_time += 0.3
+                    sleep_time += 0.1
 
     def __get_lowest_seq_nr_recv_packets(self):
         list_of_packets: list = list(self.__read_from_receive_buffer())
