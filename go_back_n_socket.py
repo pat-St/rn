@@ -1,4 +1,5 @@
 import time
+import copy
 from threading import Thread, Lock
 from lossy_udp_socket import lossy_udp_socket
 from lossy_packet_handler import lossy_packet_handler
@@ -30,7 +31,6 @@ class go_back_n_socket:
 
     __response_from_receiver: set = set()
     __response_from_receiver_lock: Lock = Lock()
-    __wait_for_response = False
 
     # buffer for receiver
     __receive_queue_msg: dict = {}
@@ -45,7 +45,6 @@ class go_back_n_socket:
     __response_payload_worker: Thread
     __send_packets_worker: Thread
     __send_timeout_worker: Thread
-    # __timeout_worker_queue: deque = deque()
     __stop_thread: bool = False
 
     # received packets getter setter
@@ -56,7 +55,7 @@ class go_back_n_socket:
 
     def __read_from_receive_buffer(self):
         self.__queue_write_lock.acquire()
-        tmp = self.__receive_queue_msg.copy()
+        tmp = copy.deepcopy(self.__receive_queue_msg)
         self.__queue_write_lock.release()
         return tmp
 
@@ -74,7 +73,7 @@ class go_back_n_socket:
 
     def __get_stored_received_msg(self):
         self.__stored_received_msg_for_read_lock.acquire()
-        tmp = self.__stored_received_msg_for_read.copy()
+        tmp = copy.deepcopy(self.__stored_received_msg_for_read)
         self.__stored_received_msg_for_read_lock.release()
         return tmp
 
@@ -91,7 +90,7 @@ class go_back_n_socket:
 
     def __read_from_response_buffer(self):
         self.__response_from_receiver_lock.acquire()
-        tmp = self.__response_from_receiver.copy()
+        tmp = copy.deepcopy(self.__response_from_receiver)
         self.__response_from_receiver_lock.release()
         return tmp
 
@@ -108,7 +107,7 @@ class go_back_n_socket:
 
     def __get_send_packets_from_queue(self):
         self.__send_packets_lock.acquire()
-        tmp = self.__send_packets.copy()
+        tmp = copy.deepcopy(self.__send_packets)
         self.__send_packets_lock.release()
         return tmp
 
@@ -125,7 +124,7 @@ class go_back_n_socket:
 
     def __get_packets_timer(self):
         self.__send_packets_timer_lock.acquire()
-        tmp = self.__send_packets_timer.copy()
+        tmp = copy.deepcopy(self.__send_packets_timer)
         self.__send_packets_timer_lock.release()
         return tmp
 
@@ -156,8 +155,7 @@ class go_back_n_socket:
         received_msg_buffer = self.__get_stored_received_msg()
         return_msg = b""
         for key, value in received_msg_buffer.items():
-            if key >= len(return_msg) or key == 0:
-                return_msg += value
+            return_msg += value
             self.__drop_stored_received_msg(key)
         bytecount = min(bytecount, len(return_msg))
         self.__reset_buffer()
@@ -183,6 +181,12 @@ class go_back_n_socket:
         for key, value in self.__get_stored_received_msg().items():
             current_bytes += len(value)
         return current_bytes == bytescount
+
+    def get_recv_bytes(self):
+        current_bytes: int = 0
+        for key, value in self.__get_stored_received_msg().items():
+            current_bytes += len(value)
+        return current_bytes
 
     def __start_worker_thread(self):
         t = Thread(target=self.__recv_packets_worker)
@@ -416,10 +420,10 @@ class go_back_n_socket:
             if len(self.__read_from_receive_buffer()) > 0:
                 current_response = self.__read_from_receive_buffer()
                 for seq_nr, value in current_response.items():
-                    # if seq_nr is not None:
-                    self.__send_ack_nr_response(seq_nr)
-                    self.__set_stored_received_msg(seq_nr, value)
-                    self.__drop_key_from_receive_buffer(seq_nr)
+                    if seq_nr is not None:
+                        self.__send_ack_nr_response(seq_nr)
+                        self.__set_stored_received_msg(seq_nr, value)
+                        self.__drop_key_from_receive_buffer(seq_nr)
                     # print("response: " + str(seq_nr))
             else:
                 time.sleep(sleep_time)
