@@ -25,21 +25,20 @@ def save_payload_response(data):
 
 def repeat_send_and_receiving():
     fist_socket = go_back_n_socket("127.0.0.1", 4300, 4303, 0, 20)
-    second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0.1)
+    second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0.2)
 
-    for i in (1500, 3000, 7000):
-        send_msg = create_msg_payload(i)
-        len_msg = len(send_msg)
-        print("len of payload: ", len_msg)
-        fist_socket.send(send_msg)
-        while second_socket.has_recv(len_msg) is False:
-            print("received: " + str(second_socket.get_recv_bytes()))
-            time.sleep(5)
-        receive_msg = second_socket.recv(len_msg)
-        assert len(receive_msg) == len(send_msg)
-        assert receive_msg == send_msg
-        print("len of received ", len(receive_msg))
-        time.sleep(2)
+    send_msg = create_msg_payload(3000)
+    len_msg = len(send_msg)
+    print("len of payload: ", len_msg)
+    fist_socket.send(send_msg)
+    while second_socket.has_recv(len_msg) is False:
+        print("received: " + str(second_socket.get_recv_bytes()))
+        time.sleep(5)
+    receive_msg = second_socket.recv(len_msg)
+    assert len(receive_msg) == len(send_msg)
+    assert receive_msg == send_msg
+    print("len of received ", len(receive_msg))
+    #time.sleep(2)
 
     fist_socket.stop()
     second_socket.stop()
@@ -86,6 +85,6 @@ def send_pdf():
     second_socket.stop()
 
 
-#repeat_send_and_receiving()
-big_data_send()
-#send_pdf()
+repeat_send_and_receiving()
+# big_data_send()
+# send_pdf()
