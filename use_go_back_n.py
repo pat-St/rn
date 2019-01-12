@@ -38,7 +38,7 @@ def repeat_send_and_receiving():
     assert len(receive_msg) == len(send_msg)
     assert receive_msg == send_msg
     print("len of received ", len(receive_msg))
-    #time.sleep(2)
+    # time.sleep(2)
 
     fist_socket.stop()
     second_socket.stop()
@@ -85,6 +85,65 @@ def send_pdf():
     second_socket.stop()
 
 
-repeat_send_and_receiving()
+# repeat_send_and_receiving()
+
+
+first_socket = None
+second_socket = None
+
+while True:
+    s = input("start>")
+    if s == "send":
+        if first_socket is None:
+            first_socket = go_back_n_socket("127.0.0.1", 4300, 4303, 0.1, 10)
+        n = input("send size>")
+        if n == "pdf":
+            create_payload = get_pdf_to_data()
+            print("send: " + str(len(create_payload)))
+            first_socket.send(create_payload)
+        else:
+            n_size: int = 0
+            try:
+                n_size = int(n)
+            except Exception:
+                print(n + " not a number")
+                pass
+            create_payload = create_msg_payload(n_size)
+            first_socket.send(create_payload)
+    elif s == "recv":
+        if second_socket is None:
+            second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0.1, 10)
+        n = input("receive size>")
+        if n == "pdf":
+            n_size: int = 469348
+            while second_socket.get_recv_bytes() != n_size:
+                time.sleep(0.5)
+            rev_msg = second_socket.recv(n_size)
+            print("receive: " + str(len(rev_msg)))
+            save_payload_response(rev_msg)
+        else:
+            n_size: int = 0
+            try:
+                n_size = int(n)
+            except Exception:
+                print(n + " not a number")
+                pass
+            while second_socket.get_recv_bytes() != n_size:
+                time.sleep(0.5)
+            rev_msg = second_socket.recv(n_size)
+            print("receive: " + str(len(rev_msg)))
+    elif s == "stop":
+        if first_socket is not None:
+            first_socket.stop()
+            first_socket = None
+        if second_socket is not None:
+            second_socket.stop()
+            second_socket = None
+
+        print("stopped")
+        break
+    else:
+        print("use send | recv | stop")
+
 # big_data_send()
 # send_pdf()

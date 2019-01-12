@@ -23,7 +23,7 @@ class lossy_udp_socket():
 
     # interface for sending packets
     def send(self, packet):
-        #print('Sending packet with length: ' + str(len(packet)))
+        print('Sending packet with length: ' + str(len(packet)))
         self.sock.sendto(packet, self.addr)
 
     # interface for ending socket
@@ -39,11 +39,11 @@ class lossy_udp_socket():
                 packet, addr = self.sock.recvfrom(self.nBytes)
                 if addr == self.addr:
                     if random.random() > self.PLR:
-                        #print('Received packet with length: ' + str(len(packet)))
+                        print('Received packet with length: ' + str(len(packet)))
                         self.conn.receive(packet)
-                    #else:
-                        #print('Dropped packet with length: ' + str(len(packet)))
-                #else:
-                    #print('Warning: received packet from remote address' + str(addr))
+                    else:
+                        print('Dropped packet with length: ' + str(len(packet)))
+                else:
+                    print('Warning: received packet from remote address' + str(addr))
             except socket.timeout:
                 pass

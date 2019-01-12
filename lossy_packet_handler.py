@@ -1,12 +1,12 @@
 from threading import Lock
 from collections import deque
 
+
 class lossy_packet_handler:
-    __packet_payload: deque = deque()
-    __read_write_mutex: Lock = Lock()
 
     def __init__(self):
-        self.data = []
+        self.__packet_payload: deque = deque()
+        self.__read_write_mutex: Lock = Lock()
 
     def receive(self, packet):
         self.__read_write_mutex.acquire()
