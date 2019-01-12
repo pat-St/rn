@@ -4,13 +4,13 @@ import random
 
 
 class lossy_udp_socket():
-    nBytes = 1500
 
-    def __init__(self, conn, loc_port, rem_addr, PLR):
+    def __init__(self, conn, loc_port, rem_addr, PLR, packet_size):
         # conn: handler to be called for received packets with function "receive(packet)"
         # loc_port: local port
         # rem_addr: remote address and port pair
         # PLR: received packets are dropped with probability PLR
+        self.nBytes = packet_size
         self.conn = conn
         self.STOP = False
         self.PLR = PLR

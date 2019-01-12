@@ -1,5 +1,6 @@
 import time
 from go_back_n_socket import go_back_n_socket
+from datetime import datetime, timedelta
 
 
 def create_msg_payload(size: int):
@@ -34,7 +35,7 @@ def repeat_send_and_receiving():
         fist_socket.send(send_msg)
         while second_socket.has_recv(len_msg) is False:
             print("received: " + str(second_socket.get_recv_bytes()))
-            time.sleep(5)
+            time.sleep(0.5)
         receive_msg = second_socket.recv(len_msg)
         assert receive_msg == send_msg
         print("len of received ", len(receive_msg))
@@ -57,7 +58,7 @@ def big_data_send():
     fist_socket.send(send_msg)
     while second_socket.has_recv(len_msg) is False:
         print("received: " + str(second_socket.get_recv_bytes()))
-        time.sleep(5)
+        time.sleep(1)
     receive_msg = second_socket.recv(len_msg)
     assert receive_msg == send_msg
     print("len of received ", len(receive_msg))
@@ -79,9 +80,8 @@ def send_pdf():
     fist_socket.send(send_msg)
     while second_socket.has_recv(len_msg) is False:
         print("received: " + str(second_socket.get_recv_bytes()))
-        time.sleep(5)
+        time.sleep(2)
     receive_msg = second_socket.recv(len_msg)
-    assert len(receive_msg) == len(send_msg)
     assert receive_msg == send_msg
     save_payload_response(receive_msg)
     print("len of received ", len(receive_msg))
@@ -91,6 +91,27 @@ def send_pdf():
     time.sleep(2)
     first_socket = None
     second_socket = None
+
+
+def send_with_stats(window_size: int = 10):
+    fist_socket = go_back_n_socket("127.0.0.1", 4300, 4303, 0, window_size, send_packet_size=1000)
+    second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0.1)
+    start_time = datetime.utcnow()
+    send_msg = create_msg_payload(257500)
+    len_msg = len(send_msg)
+    fist_socket.send(send_msg)
+    while second_socket.has_recv(len_msg) is False:
+        time.sleep(0.2)
+    receive_msg = second_socket.recv(len_msg)
+    end_time = datetime.utcnow()
+    #print("total time ", str((end_time - start_time).seconds))
+
+    fist_socket.stop()
+    second_socket.stop()
+    time.sleep(2)
+    first_socket = None
+    second_socket = None
+    return (end_time - start_time).seconds
 
 
 first_socket = None
@@ -153,8 +174,16 @@ while True:
             print("test send pdf")
             send_pdf()
             print("all tests done")
+    elif s == "stats":
+        if first_socket is None and second_socket is None:
+            best_list = (0, 500)
+            for i in range(5, 300):
+                time_lap = send_with_stats(i)
+                if best_list[1] > time_lap:
+                    best_list = (i, time_lap)
+            print("found best time: " + str(best_list))
     elif s == "stop":
         print("stopped")
         break
     else:
-        print("use send | recv | test | stop")
+        print("use send | recv | test | stats | stop")

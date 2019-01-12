@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 class go_back_n_socket:
 
-    def __init__(self, ip_address: str, local_port: int, remote_port: int, drop_percent=0, window_size=4):
+    def __init__(self, ip_address: str, local_port: int, remote_port: int, drop_percent=0, window_size=4, send_packet_size: int=1500):
         # connection config
         self.__des_ip: str = ip_address
         self.__loc_port: int = local_port
@@ -19,7 +19,7 @@ class go_back_n_socket:
         self.__go_back_handler = lossy_packet_handler()
 
         # sending config
-        self.__segment_size: int = 1468
+        self.__segment_size: int = send_packet_size - 32
         self.__window_size: int = window_size
         self.__send_timeout: int = 2
 
@@ -48,7 +48,7 @@ class go_back_n_socket:
         self.__send_timeout_worker: Thread
         self.__stop_thread: bool = False
 
-        self.connection = lossy_udp_socket(self.__go_back_handler, local_port, (ip_address, remote_port), drop_percent)
+        self.connection = lossy_udp_socket(self.__go_back_handler, local_port, (ip_address, remote_port), drop_percent, send_packet_size)
         self.__start_worker_thread()
 
     # received packets getter setter
