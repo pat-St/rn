@@ -24,31 +24,34 @@ def save_payload_response(data):
 
 
 def repeat_send_and_receiving():
-    fist_socket = go_back_n_socket("127.0.0.1", 4300, 4303, 0, 20)
-    second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0.2)
+    fist_socket = go_back_n_socket("127.0.0.1", 4300, 4303, 0, 5)
+    second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0)
 
-    send_msg = create_msg_payload(3000)
-    len_msg = len(send_msg)
-    print("len of payload: ", len_msg)
-    fist_socket.send(send_msg)
-    while second_socket.has_recv(len_msg) is False:
-        print("received: " + str(second_socket.get_recv_bytes()))
-        time.sleep(5)
-    receive_msg = second_socket.recv(len_msg)
-    assert len(receive_msg) == len(send_msg)
-    assert receive_msg == send_msg
-    print("len of received ", len(receive_msg))
-    # time.sleep(2)
+    for i in (1500, 3000, 70000):
+        send_msg = create_msg_payload(i)
+        len_msg = len(send_msg)
+        print("len of payload: ", len_msg)
+        fist_socket.send(send_msg)
+        while second_socket.has_recv(len_msg) is False:
+            print("received: " + str(second_socket.get_recv_bytes()))
+            time.sleep(5)
+        receive_msg = second_socket.recv(len_msg)
+        assert receive_msg == send_msg
+        print("len of received ", len(receive_msg))
+        time.sleep(2)
 
     fist_socket.stop()
     second_socket.stop()
+    time.sleep(2)
+    first_socket = None
+    second_socket = None
 
 
 def big_data_send():
-    fist_socket = go_back_n_socket("127.0.0.1", 4300, 4303, 0, 20)
-    second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0)
+    fist_socket = go_back_n_socket("127.0.0.1", 4300, 4303, 0.2, 20)
+    second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0.2, 20)
 
-    send_msg = create_msg_payload(27000)
+    send_msg = create_msg_payload(270000)
     len_msg = len(send_msg)
     print("len of payload: ", len_msg)
     fist_socket.send(send_msg)
@@ -56,12 +59,14 @@ def big_data_send():
         print("received: " + str(second_socket.get_recv_bytes()))
         time.sleep(5)
     receive_msg = second_socket.recv(len_msg)
-    assert len(receive_msg) == len(send_msg)
     assert receive_msg == send_msg
     print("len of received ", len(receive_msg))
 
     fist_socket.stop()
     second_socket.stop()
+    time.sleep(2)
+    first_socket = None
+    second_socket = None
 
 
 def send_pdf():
@@ -83,9 +88,9 @@ def send_pdf():
 
     fist_socket.stop()
     second_socket.stop()
-
-
-# repeat_send_and_receiving()
+    time.sleep(2)
+    first_socket = None
+    second_socket = None
 
 
 first_socket = None
@@ -110,12 +115,16 @@ while True:
                 pass
             create_payload = create_msg_payload(n_size)
             first_socket.send(create_payload)
+        if first_socket is not None:
+            first_socket.stop()
+            first_socket = None
     elif s == "recv":
         if second_socket is None:
             second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0.1, 10)
         n = input("receive size>")
         if n == "pdf":
-            n_size: int = 469348
+            n_size: int = len(get_pdf_to_data())
+            print("receive: " + str(n_size))
             while second_socket.get_recv_bytes() != n_size:
                 time.sleep(0.5)
             rev_msg = second_socket.recv(n_size)
@@ -132,18 +141,20 @@ while True:
                 time.sleep(0.5)
             rev_msg = second_socket.recv(n_size)
             print("receive: " + str(len(rev_msg)))
-    elif s == "stop":
-        if first_socket is not None:
-            first_socket.stop()
-            first_socket = None
         if second_socket is not None:
             second_socket.stop()
             second_socket = None
-
+    elif s == "test":
+        if first_socket is None and second_socket is None:
+            print("test repeat send and receive")
+            repeat_send_and_receiving()
+            print("test send big data with drop")
+            big_data_send()
+            print("test send pdf")
+            send_pdf()
+            print("all tests done")
+    elif s == "stop":
         print("stopped")
         break
     else:
-        print("use send | recv | stop")
-
-# big_data_send()
-# send_pdf()
+        print("use send | recv | test | stop")
