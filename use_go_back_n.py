@@ -119,6 +119,9 @@ second_socket = None
 
 while True:
     s = input("start>")
+    if first_socket is not None:
+        first_socket.stop()
+        first_socket = None
     if s == "send":
         if first_socket is None:
             first_socket = go_back_n_socket("127.0.0.1", 4300, 4303, 0.1, 10)
@@ -136,9 +139,6 @@ while True:
                 pass
             create_payload = create_msg_payload(n_size)
             first_socket.send(create_payload)
-        if first_socket is not None:
-            first_socket.stop()
-            first_socket = None
     elif s == "recv":
         if second_socket is None:
             second_socket = go_back_n_socket("127.0.0.1", 4303, 4300, 0.1, 10)
@@ -176,12 +176,15 @@ while True:
             print("all tests done")
     elif s == "stats":
         if first_socket is None and second_socket is None:
-            best_list = (0, 500)
-            for i in range(5, 300):
-                time_lap = send_with_stats(i)
-                if best_list[1] > time_lap:
-                    best_list = (i, time_lap)
-            print("found best time: " + str(best_list))
+            n = input("window size>")
+            try:
+                n_size = int(n)
+                time_lap = send_with_stats(n_size)
+                print("time: " + str(time_lap))
+            except Exception:
+                print(n + " not a number")
+                pass
+
     elif s == "stop":
         print("stopped")
         break

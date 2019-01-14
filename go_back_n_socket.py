@@ -141,7 +141,7 @@ class go_back_n_socket:
         self.__send_packets_timer_lock.release()
 
     def send(self, msg: bytes):
-        self.__reset_buffer()
+        #self.__reset_buffer()
         self.__prepare_msg_for_send(msg)
 
     def recv(self, byte_count: int):
@@ -358,7 +358,7 @@ class go_back_n_socket:
     def __get_lowest_seq_nr_send_packets(self):
         if len(self.__get_send_packets_from_queue()) == 0:
             return None
-        return sorted(self.__get_send_packets_from_queue())[0]
+        return min(sorted(self.__get_send_packets_from_queue()))
 
     def __timeout_handler(self):
         sleep_time: float = 0.2
